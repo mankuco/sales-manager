@@ -1,5 +1,5 @@
 import { requireUser, sameOrigin } from "../lib/auth.js";
-import { db } from "../lib/store.js";
+import { db, dbEnvNames } from "../lib/store.js";
 
 const KEY = "events"; // Redis hash: party id -> party JSON
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -9,7 +9,12 @@ export default async function handler(req, res) {
   const user = requireUser(req, res);
   if (!user) return;
   const r = db();
-  if (!r) return res.status(503).json({ error: "Falta conectar la base de datos (Upstash Redis) en Vercel." });
+  if (!r) {
+    const found = dbEnvNames();
+    return res.status(503).json({ error: found.length
+      ? `No reconozco la base de datos. Variables encontradas: ${found.join(", ")}.`
+      : "No hay ninguna base de datos conectada a este proyecto en Vercel (Storage). Si ya la conectaste, haz Redeploy." });
+  }
 
   if (req.method === "GET") {
     const all = (await r.hgetall(KEY)) || {};
