@@ -1,0 +1,12 @@
+{
+  "name": "radar-taquilla",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@upstash/redis": "^1.39.0"
+  }
+}

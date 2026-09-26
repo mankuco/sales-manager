@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Radar de Taquilla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+html{color-scheme:light}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  --bg:#f3f3f6; --surface:#ffffff; --surface-2:#ebebf1; --line:#d9d8e2;
+  --ink:#15141b; --ink-2:#4d4b5c; --ink-3:#7a7889;
+  --accent:#3b36c9; --accent-ink:#ffffff; --accent-soft:#e6e5fb;
+  --good:#12814a; --good-soft:#dcf3e6; --warn:#a86a00; --warn-soft:#fbefd2; --bad:#c7322f; --bad-soft:#fbe1df;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --cap:#7a7889;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121218; --surface:#1b1b23; --surface-2:#25252f; --line:#34343f;
+    --ink:#f2f1f7; --ink-2:#bdbbcb; --ink-3:#8c8a9c;
+    --accent:#8f8bff; --accent-ink:#121218; --accent-soft:#2a2850;
+    --good:#4cc88a; --good-soft:#15352a; --warn:#e5ad3c; --warn-soft:#3a2d12; --bad:#f07a74; --bad-soft:#3e1d1d;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --cap:#8c8a9c;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121218; --surface:#1b1b23; --surface-2:#25252f; --line:#34343f;
+  --ink:#f2f1f7; --ink-2:#bdbbcb; --ink-3:#8c8a9c;
+  --accent:#8f8bff; --accent-ink:#121218; --accent-soft:#2a2850;
+  --good:#4cc88a; --good-soft:#15352a; --warn:#e5ad3c; --warn-soft:#3a2d12; --bad:#f07a74; --bad-soft:#3e1d1d;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --cap:#8c8a9c;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:26px;font-weight:800}
+h2{font-size:18px;font-weight:600}
+h3{font-size:15px;font-weight:600;font-family:var(--body)}
+p{margin:0}
+.muted{color:var(--ink-2)}
+.small{font-size:13px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;font-weight:500}
+button:hover{border-color:var(--ink-3)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.08)}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.55;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+textarea{resize:vertical;min-height:70px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2);font-weight:500}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.top .brand{display:flex;flex-direction:column;gap:2px}
+.top .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.top select{width:auto;max-width:260px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+
+.example{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:14px 18px;align-items:center;border-radius:14px;padding:18px;border:1px solid var(--line);background:var(--surface)}
+.verdict .pill{font-family:var(--display);font-weight:800;font-size:15px;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.verdict[data-tone="good"] .pill{background:var(--good-soft);color:var(--good)}
+.verdict[data-tone="warn"] .pill{background:var(--warn-soft);color:var(--warn)}
+.verdict[data-tone="bad"] .pill{background:var(--bad-soft);color:var(--bad)}
+.verdict[data-tone="neutral"] .pill{background:var(--surface-2);color:var(--ink-2)}
+.verdict .line{font-size:16px}
+@media (max-width:560px){.verdict{grid-template-columns:1fr}}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.kpi .v{font-family:var(--mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi .v small{font-size:14px;color:var(--ink-3)}
+.bar{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:6px}
+.bar > i{display:block;height:100%;background:var(--s1);border-radius:99px}
+
+.chart-wrap{position:relative;overflow-x:auto}
+.chart-wrap svg{display:block;width:100%;min-width:520px;height:auto}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;border-radius:8px;padding:8px 10px;white-space:nowrap;line-height:1.45;transform:translate(-50%,-100%);display:none;z-index:2}
+.tip b{font-family:var(--mono);font-weight:500}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:600;color:var(--ink-3);font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right}
+.tablewrap{overflow-x:auto}
+
+.plan{display:flex;flex-direction:column;gap:0}
+.day{display:grid;grid-template-columns:78px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.day:last-child{border-bottom:0}
+.day .when{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);line-height:1.35}
+.day .when b{display:block;color:var(--ink);font-size:14px;font-weight:500}
+.day .what{display:flex;flex-direction:column;gap:3px}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+.tips{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+
+.ai-out{white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:14px;font-size:14.5px;line-height:1.55;max-height:560px;overflow:auto}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.form .full{grid-column:1/-1}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.mapping{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.note{font-size:13px;color:var(--ink-2)}
+.login{min-height:80vh;display:grid;place-items:center}
+.login-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px}
+.ok{color:var(--good)} .err{color:var(--bad)}
+details.panel > summary{cursor:pointer;font-family:var(--display);font-weight:600;font-size:18px;list-style:none}
+details.panel > summary::-webkit-details-marker{display:none}
+details.panel > summary::after{content:"＋";float:right;color:var(--ink-3)}
+details.panel[open] > summary::after{content:"－"}
+@media (prefers-reduced-motion:no-preference){.bar>i{transition:width .5s ease}}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <form class="login-card" id="loginForm">
+    <span class="eyebrow">Ventas Entradium</span>
+    <h1>Radar de Taquilla</h1>
+    <label>Usuario<input id="lUser" autocapitalize="none" autocomplete="username" required></label>
+    <label>Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
+    <button class="primary" id="loginBtn" type="submit">Entrar</button>
+    <p class="small err" id="loginMsg"></p>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Ventas Entradium</span>
+      <h1>Radar de Taquilla</h1>
+    </div>
+    <div class="controls">
+      <select id="evSel" aria-label="Fiesta"></select>
+      <button class="primary" id="newXlsBtn">Crear desde Excel</button>
+      <button id="newBtn">Crear a mano</button>
+      <button id="editBtn">Editar fiesta</button>
+    </div>
+  </header>
+
+  <div id="exampleBar" class="example" hidden>
+    <span>Estás viendo una fiesta de <b>ejemplo</b>. Los números no son tuyos. Sube el Excel de Entradium y se crea tu fiesta.</span>
+    <button class="primary" id="startBtn">Crear desde Excel</button>
+  </div>
+
+  <section class="panel" id="xlsPanel" hidden>
+    <div class="panel-head">
+      <h2>Crear fiestas desde Excel</h2>
+      <button id="xlsClose">Cerrar</button>
+    </div>
+    <p class="note">Sube el Excel de ventas o asistentes que descargas de Entradium. Saco de él la fecha de cada venta, los tipos de entrada, sus precios y los ingresos. Si el archivo trae varias fiestas, se crea una por cada una. Si ya existe una fiesta con el mismo nombre, se actualizan sus ventas.</p>
+    <div class="drop" id="drop2">
+      <span class="muted small">Arrastra el .xls / .xlsx / .csv</span>
+      <input type="file" id="file2" accept=".xls,.xlsx,.csv" style="width:auto">
+    </div>
+    <div id="nMapBox" hidden style="display:flex;flex-direction:column;gap:12px">
+      <p class="note" id="nMapInfo"></p>
+      <details>
+        <summary class="small" style="cursor:pointer">Revisar qué columna es cada dato</summary>
+        <div class="mapping" style="margin-top:10px">
+          <label>Fecha de compra<select id="nDate"></select></label>
+          <label>Importe<select id="nPrice"></select></label>
+          <label>Tipo de entrada<select id="nType"></select></label>
+          <label>Cantidad<select id="nQty"></select></label>
+          <label>Estado<select id="nStatus"></select></label>
+          <label>Nombre del evento<select id="nEvent"></select></label>
+          <label>Fecha del evento<select id="nSession"></select></label>
+        </div>
+      </details>
+      <div id="nList" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="row"><button class="primary" id="nCreate">Crear fiestas</button><span class="small" id="nMsg"></span></div>
+    </div>
+  </section>
+
+  <section id="verdict" class="verdict" data-tone="neutral">
+    <span class="pill" id="vPill">—</span>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <p class="line" id="vLine"></p>
+      <p class="small muted" id="vSub"></p>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Curva de venta</h2>
+      <span class="small muted">Entradas acumuladas por días que faltan para la fiesta</span>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart-wrap" id="chartWrap"><svg id="chart" viewBox="0 0 900 320" role="img" aria-label="Curva de venta"></svg><div class="tip" id="tip"></div></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="panel-head"><h2>Plan de redes</h2><span class="small muted" id="planSub"></span></div>
+      <div class="plan" id="plan"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Qué subir</h2></div>
+      <ul class="tips" id="ideas"></ul>
+      <div id="aiBox" hidden style="display:flex;flex-direction:column;gap:10px">
+        <div class="row">
+          <button class="primary" id="aiBtn">Pedir plan a Claude</button>
+          <button id="aiStop" hidden>Parar</button>
+          <span class="small muted" id="aiNote">Usa tus números y las notas de la fiesta.</span>
+        </div>
+        <div class="ai-out" id="aiOut" hidden></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Entradas por tipo</h2><span class="small muted" id="tierSub"></span></div>
+    <div class="tablewrap"><table id="tiers"></table></div>
+  </section>
+
+  <section class="panel" id="updatePanel">
+    <div class="panel-head">
+      <h2>Actualizar ventas</h2>
+      <span class="small muted" id="lastUpd"></span>
+    </div>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Subir el Excel de Entradium</h3>
+        <p class="note">En Entradium: tu evento → Ventas / Asistentes → descargar XLS. Arrástralo aquí. Cada vez que lo subas se recalcula todo.</p>
+        <div class="drop" id="drop">
+          <span class="muted small">Arrastra el .xls / .xlsx / .csv</span>
+          <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)">
+            <input type="file" id="file" accept=".xls,.xlsx,.csv" style="width:auto">
+          </label>
+        </div>
+        <div id="mapBox" hidden style="display:flex;flex-direction:column;gap:10px">
+          <p class="note" id="mapInfo"></p>
+          <div class="mapping">
+            <label>Fecha de compra<select id="mDate"></select></label>
+            <label>Importe<select id="mPrice"></select></label>
+            <label>Tipo de entrada<select id="mType"></select></label>
+            <label>Cantidad<select id="mQty"></select></label>
+            <label>Estado<select id="mStatus"></select></label>
+          </div>
+          <div class="row"><button class="primary" id="importBtn">Importar ventas</button><span class="small" id="importMsg"></span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Apunte rápido desde el móvil</h3>
+        <p class="note">Mira el contador en la app de Entradium y escribe los totales de hoy. Así la curva sigue viva entre Excel y Excel.</p>
+        <div class="form">
+          <label>Entradas vendidas (total)<input id="qSold" type="number" min="0" inputmode="numeric"></label>
+          <label>Ingresos totales (€)<input id="qRev" type="number" min="0" step="0.01" inputmode="decimal" placeholder="opcional"></label>
+        </div>
+        <div class="row"><button class="primary" id="quickBtn">Guardar apunte de hoy</button><span class="small" id="quickMsg"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="formPanel" hidden>
+    <div class="panel-head"><h2 id="formTitle">Datos de la fiesta</h2></div>
+    <div class="form">
+      <label class="full">Nombre<input id="fName" placeholder="Ej. Fiesta Blanca · Octubre"></label>
+      <label>Fecha y hora<input id="fDate" type="datetime-local"></label>
+      <label>Aforo<input id="fCap" type="number" min="1" inputmode="numeric"></label>
+      <label>Ventas finales (solo fiestas pasadas sin Excel)<input id="fFinal" type="number" min="0" inputmode="numeric" placeholder="opcional"></label>
+      <label class="full">Tandas de entradas, una por línea: nombre; precio; cupo<textarea id="fTiers" placeholder="Early bird; 10; 150&#10;Segunda tanda; 14; 250&#10;Última tanda; 18; 200"></textarea></label>
+      <label class="full">Notas para los consejos: estilo de fiesta, público, redes que usas, seguidores<textarea id="fNotes" placeholder="Reggaeton y comercial, público 18-25, Instagram 4.200 seguidores y TikTok, hacemos sorteos de mesa…"></textarea></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="saveBtn">Guardar</button>
+      <button id="cancelBtn">Cancelar</button>
+      <span style="flex:1"></span>
+      <button class="danger" id="delBtn">Borrar fiesta</button>
+      <span id="delConfirm" hidden class="row"><span class="small">¿Seguro? Se borra para siempre.</span><button class="danger" id="delYes">Sí, borrar</button><button id="delNo">No</button></span>
+    </div>
+    <p class="small" id="formMsg"></p>
+  </section>
+
+  <div class="small muted row" style="justify-content:space-between"><span id="storeNote">Conectado como <b id="who"></b>. Los cambios de otros dispositivos aparecen en menos de un minuto.</span><button id="logoutBtn">Salir</button></div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const DAY = 864e5;
+const eur = n => (n == null || isNaN(n)) ? "—" : n.toLocaleString("es-ES", {style:"currency", currency:"EUR", maximumFractionDigits: n >= 1000 ? 0 : 2});
+const int = n => (n == null || isNaN(n)) ? "—" : Math.round(n).toLocaleString("es-ES");
+const pct = n => (n == null || isNaN(n)) ? "—" : Math.round(n * 100) + "%";
+const pad = n => String(n).padStart(2, "0");
+const dayKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const keyDate = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDay = d => d.toLocaleDateString("es-ES", {weekday:"short", day:"numeric", month:"short"});
+
+/* ---------- storage: own API ---------- */
+let me = null, events = [], selId = null, isExample = false;
+async function api(path, opts = {}) {
+  const r = await fetch(path, {credentials: "same-origin", ...opts, headers: {"Content-Type": "application/json", ...(opts.headers || {})}});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== "/api/login") { me = null; showApp(false); }
+  if (!r.ok) throw {code: r.status, message: j.error || "Error " + r.status};
+  return j;
+}
+async function saveEvent(ev) {
+  ev.updatedAt = new Date().toISOString();
+  await api("/api/events", {method: "PUT", body: JSON.stringify({event: ev})});
+  await loadEvents();
+}
+async function deleteEvent(id) {
+  await api("/api/events?id=" + encodeURIComponent(id), {method: "DELETE"});
+  selId = null; await loadEvents();
+}
+let lastSig = "";
+async function loadEvents() {
+  try {
+    const {events: list} = await api("/api/events");
+    const sig = JSON.stringify(list);
+    if (sig === lastSig && events.length) return;
+    lastSig = sig; events = list; render();
+  } catch (e) { if (e.code !== 401) $("storeNote").textContent = e.message; }
+}
+
+/* ---------- example event (never saved) ---------- */
+function exampleEvents() {
+  const now = new Date();
+  const mk = (name, daysFromNow, cap, final, tiers, notes) => {
+    const date = new Date(startOfDay(now).getTime() + daysFromNow * DAY + 23.5 * 3600e3);
+    const points = {};
+    const curve = d => d > 40 ? 0 : Math.pow(1 - d / 40, 2.2);
+    let sold = 0, rev = 0;
+    for (let d = 40; d >= 0; d--) {
+      const day = new Date(startOfDay(date).getTime() - d * DAY);
+      if (day > now) break;
+      const target = Math.round(final * curve(d));
+      if (target > sold) { rev += (target - sold) * (d > 20 ? 10 : d > 7 ? 14 : 18); sold = target; points[dayKey(day)] = {sold, rev}; }
+    }
+    return {id:"ex-" + name, name, date: date.toISOString(), capacity: cap, tiers, points, tierSold:{}, notes, example:true};
+  };
+  const tiers = [{name:"Early bird", price:10, qty:150},{name:"Segunda tanda", price:14, qty:250},{name:"Última tanda", price:18, qty:200}];
+  const cur = mk("Fiesta de ejemplo", 9, 600, 560, tiers, "Fiesta de ejemplo");
+  // current event is behind: scale down what has sold so far
+  for (const k in cur.points) { cur.points[k].sold = Math.round(cur.points[k].sold * 0.8); cur.points[k].rev = Math.round(cur.points[k].rev * 0.8); }
+  const last = Object.keys(cur.points).sort().pop();
+  const s = last ? cur.points[last].sold : 0;
+  cur.tierSold = {"Early bird":{q:Math.min(150, s), r:Math.min(150, s) * 10}, "Segunda tanda":{q:Math.max(0, Math.min(250, s - 150)), r:Math.max(0, Math.min(250, s - 150)) * 14}, "Última tanda":{q:Math.max(0, s - 400), r:Math.max(0, s - 400) * 18}};
+  const past = mk("Ejemplo pasada", -35, 600, 590, tiers, "");
+  return [cur, past];
+}
+
+/* ---------- math ---------- */
+const evDate = ev => new Date(ev.date);
+function series(ev) {
+  const eDay = startOfDay(evDate(ev));
+  return Object.keys(ev.points || {}).sort().map(k => ({k, d: Math.round((eDay - keyDate(k)) / DAY), sold: ev.points[k].sold, rev: ev.points[k].rev}));
+}
+function soldAt(ser, d) { let v = 0; for (const p of ser) { if (p.d >= d) v = p.sold; else break; } return v; }
+const finalOf = ev => { const s = series(ev); const last = s.length ? s[s.length - 1].sold : 0; return Math.max(last, Number(ev.finalSold) || 0); };
+const GENERIC = [[60,.08],[30,.22],[21,.3],[14,.4],[10,.48],[7,.57],[5,.65],[3,.75],[2,.82],[1,.9],[0,1]];
+function genericFrac(d) {
+  if (d >= 60) return .08; if (d <= 0) return 1;
+  for (let i = 0; i < GENERIC.length - 1; i++) { const [d1, f1] = GENERIC[i], [d2, f2] = GENERIC[i + 1]; if (d <= d1 && d >= d2) return f2 + (f1 - f2) * (d - d2) / (d1 - d2); }
+  return 1;
+}
+function pastEvents(cur) {
+  const now = new Date();
+  return events.filter(e => e.id !== cur.id && evDate(e) < now && finalOf(e) > 0 && Object.keys(e.points || {}).length >= 3)
+    .sort((a, b) => evDate(b) - evDate(a));
+}
+function fracAt(cur, d) {
+  const fr = pastEvents(cur).map(e => soldAt(series(e), d) / finalOf(e)).filter(f => f >= .05);
+  if (fr.length) return {f: fr.reduce((a, b) => a + b, 0) / fr.length, src: fr.length === 1 ? "tu fiesta anterior" : "tus " + fr.length + " fiestas anteriores"};
+  return {f: genericFrac(d), src: "una curva típica de fiestas (sube tus fiestas pasadas para afinar)"};
+}
+
+function metrics(ev) {
+  const now = new Date(), ser = series(ev);
+  const last = ser[ser.length - 1];
+  const sold = last ? last.sold : 0, rev = last ? last.rev : 0;
+  const cap = Number(ev.capacity) || 0;
+  const daysLeft = (evDate(ev) - now) / DAY;
+  const dNow = Math.max(0, Math.round((startOfDay(evDate(ev)) - startOfDay(now)) / DAY));
+  const s7 = soldAt(ser, dNow + 7);
+  const firstD = ser.length ? ser[0].d : dNow;
+  const span = Math.max(1, Math.min(7, firstD - dNow));
+  const pace7 = ser.length ? (sold - (firstD - dNow < 7 ? 0 : s7)) / span : 0;
+  const remaining = Math.max(0, cap - sold);
+  const needed = daysLeft > 0 ? remaining / Math.max(1, Math.ceil(daysLeft)) : 0;
+  const fr = fracAt(ev, dNow);
+  const projected = sold > 0 ? Math.round(sold / Math.max(fr.f, .05)) : 0;
+  const avgPrice = sold ? rev / sold : null;
+  const tierPrices = (ev.tiers || []).map(t => t.price).filter(Boolean);
+  const nextPrice = tierPrices.length ? tierPrices[tierPrices.length - 1] : avgPrice;
+  const projRev = projected > sold ? rev + (Math.min(projected, cap || projected) - sold) * (nextPrice || avgPrice || 0) : rev;
+  const lastUpdate = ev.updatedAt ? new Date(ev.updatedAt) : null;
+  return {sold, rev, cap, daysLeft, dNow, pace7, remaining, needed, projected, projRev, avgPrice, frSrc: fr.src, frac: fr.f, ratio: cap ? projected / cap : null, fill: cap ? sold / cap : null, lastUpdate, past: daysLeft < -0.5};
+}
+
+function verdictOf(m) {
+  if (m.past) return {tone:"neutral", pill:"Fiesta pasada", line:`Cerró con ${int(m.sold)} entradas${m.cap ? " (" + pct(m.fill) + " del aforo)" : ""} y ${eur(m.rev)}.`, sub:"Sirve de referencia para prever tus próximas fiestas."};
+  if (!m.sold) return {tone:"neutral", pill:"Sin datos aún", line:"Sube el Excel de Entradium o apunta las ventas de hoy para empezar.", sub:""};
+  if (!m.cap) return {tone:"neutral", pill:"Falta el aforo", line:`Llevas ${int(m.sold)} entradas y ${eur(m.rev)}. Pon el aforo en “Editar fiesta” para ver si vas a llenar.`, sub:""};
+  if (m.fill >= 0.95) return {tone:"good", pill:"Casi sold out", line:`Quedan ${int(m.remaining)} entradas. Usa la escasez: anuncia que se acaban.`, sub:"No gastes en publicidad; empuja con stories de “últimas entradas”."};
+  const r = m.ratio;
+  if (r >= 1) return {tone:"good", pill:"Vas a llenar", line:`Al ritmo actual acabarías en unas ${int(Math.min(m.projected, m.cap))} de ${int(m.cap)}. Mantén el ritmo de publicaciones.`, sub:`Previsión basada en ${m.frSrc}.`};
+  if (r >= 0.85) return {tone:"warn", pill:"Empuja un poco", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Te faltan unas ${int(m.cap - m.projected)} ventas para llenar.`, sub:`Previsión basada en ${m.frSrc}.`};
+  return {tone:"bad", pill:"Aprieta en redes", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Necesitas ${int(m.needed)} ventas al día y vas a ${m.pace7.toFixed(1).replace(".", ",")}.`, sub:`Previsión basada en ${m.frSrc}.`};
+}
+
+/* ---------- social plan ---------- */
+function planFor(ev, m) {
+  const tone = verdictOf(m).tone;
+  const push = tone === "bad" ? 2 : tone === "warn" ? 1 : 0;
+  const days = Math.min(7, Math.max(0, m.dNow) + 1);
+  const out = [];
+  const tierLeft = (ev.tiers || []).find(t => ((ev.tierSold || {})[t.name]?.q || 0) < t.qty);
+  for (let i = 0; i < days; i++) {
+    const d = m.dNow - i;
+    const date = new Date(startOfDay(new Date()).getTime() + i * DAY);
+    let feed, stories, tag;
+    if (d === 0) { tag = "Hoy es"; feed = "Post “Esta noche” con la hora de apertura y el enlace. Recuerda que en taquilla sale más cara."; stories = "Stories cada 2-3 horas: montaje, prueba de sonido, cuenta atrás."; }
+    else if (d === 1) { tag = "Última llamada"; feed = "Reel de la última fiesta con el texto “Mañana”. Enlace en bio y en stories."; stories = `Stories con sticker de enlace: quedan ${int(m.remaining)} entradas${m.fill > .6 ? ", menciona que se acaban" : ""}.`; }
+    else if (d <= 3) { tag = "Cuenta atrás"; feed = i % 2 ? "Carrusel con el horario, lineup y precios de cada tanda." : "Reel de 10-15 s con el mejor momento de la última fiesta y “Faltan " + d + " días”."; stories = "Cuenta atrás, encuesta (“¿Con quién vienes?”) y reposts de quien etiquete."; }
+    else if (d <= 7) { tag = "Semana de fiesta"; feed = ["Anuncio del DJ o artista invitado con vídeo corto.", "Sorteo: 2 entradas + mesa, participar = seguir, compartir y etiquetar a 2 amigos.", "Reel de ambiente (público, luces, momentos top).", "Post “Entradas por tandas”: cuándo sube el precio."][i % 4]; stories = "2-3 stories al día con enlace a Entradium."; }
+    else if (d <= 21) { tag = "Calentar"; feed = ["Reel de la última edición.", "Revelar parte del lineup.", "Post con fecha límite del precio actual."][i % 3]; stories = "1-2 stories al día, encuestas y cuenta atrás al cambio de precio."; }
+    else { tag = "Anuncio"; feed = ["Cartel oficial con fecha, sitio y enlace.", "Reel resumen de la última fiesta.", "Early bird: cupo limitado."][i % 3]; stories = "1 story al día recordando el early bird."; }
+    if (push >= 1 && d > 0 && d <= 10 && i % 3 === 0) stories += " Pide a relaciones públicas y amigos que lo compartan.";
+    if (push === 2 && d > 1 && i === 0) feed += " Considera 20-40 € en anuncio de Instagram segmentado por ciudad y edad.";
+    if (tierLeft && d > 1 && i === 1 && push) stories += ` Avisa de que la tanda “${tierLeft.name}” se acaba.`;
+    out.push({date, d, tag, feed, stories});
+  }
+  return out;
+}
+function ideasFor(ev, m) {
+  const v = verdictOf(m);
+  const L = [];
+  if (m.past) return ["Sube el Excel final de esta fiesta si no lo has hecho: así la previsión de la próxima será más precisa.", "Guarda los 3 vídeos con más visualizaciones; serán el contenido de la próxima campaña."];
+  if (v.tone === "bad") {
+    L.push("Publica ya un reel con el mejor momento de la última fiesta. Es lo que más vende en fiestas: la gente compra el ambiente.");
+    L.push("Haz un sorteo de entradas o de una mesa: dispara el alcance en 48 horas.");
+    L.push("Activa a tus relaciones públicas con un código o enlace propio y un premio para quien más venda.");
+    L.push("Anuncio pagado pequeño (20-40 €) en Instagram, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.");
+  } else if (v.tone === "warn") {
+    L.push("Sube la frecuencia de stories a 2-3 al día, siempre con sticker de enlace.");
+    L.push("Anuncia fecha y hora del siguiente cambio de precio: crea urgencia sin bajar precios.");
+    L.push("Publica testimonios o reposts de gente que ya tiene entrada.");
+  } else {
+    L.push("No bajes precios. Comunica cuántas quedan para acelerar a los indecisos.");
+    L.push("Guarda el presupuesto de anuncios para la próxima fiesta.");
+  }
+  if (m.daysLeft <= 3 && m.daysLeft > 0) L.push("Estos días la mayoría compra a última hora: stories con enlace varias veces al día.");
+  if (m.fill > .7) L.push(`Mensaje de escasez: “Quedan ${int(m.remaining)} entradas”.`);
+  return L;
+}
+
+/* ---------- chart ---------- */
+function drawChart(ev, m) {
+  const svg = $("chart"), tip = $("tip");
+  const W = 900, H = 320, P = {l:52, r:20, t:16, b:36};
+  const cur = series(ev), pasts = pastEvents(ev).slice(0, 2).map(e => ({ev:e, s:series(e)}));
+  const maxD = Math.max(14, ...[cur, ...pasts.map(p => p.s)].map(s => s.length ? s[0].d : 0), m.dNow);
+  const projEnd = m.past ? null : Math.min(m.projected, Math.max(m.cap, m.projected));
+  const maxY = Math.max(10, m.cap || 0, projEnd || 0, ...pasts.map(p => finalOf(p.ev)), m.sold) * 1.08;
+  const x = d => P.l + (maxD - d) / maxD * (W - P.l - P.r);
+  const y = v => H - P.b - v / maxY * (H - P.t - P.b);
+  const step = maxY > 1500 ? 500 : maxY > 600 ? 200 : maxY > 250 ? 100 : maxY > 100 ? 50 : 10;
+  let g = "";
+  for (let v = 0; v <= maxY; v += step) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${P.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--ink-3)" font-family="var(--mono)">${v}</text>`;
+  const xs = maxD > 45 ? 14 : maxD > 20 ? 7 : 2;
+  for (let d = 0; d <= maxD; d += xs) g += `<text x="${x(d)}" y="${H - P.b + 18}" text-anchor="middle" font-size="11" fill="var(--ink-3)" font-family="var(--mono)">${d === 0 ? "fiesta" : "-" + d + "d"}</text>`;
+  if (m.cap) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(m.cap)}" y2="${y(m.cap)}" stroke="var(--cap)" stroke-width="1.5" stroke-dasharray="6 5"/><text x="${W - P.r}" y="${y(m.cap) - 6}" text-anchor="end" font-size="11.5" fill="var(--ink-2)">Aforo ${int(m.cap)}</text>`;
+  const path = s => s.map((p, i) => (i ? "L" : "M") + x(p.d).toFixed(1) + "," + y(p.sold).toFixed(1)).join("");
+  const stepPath = s => { if (!s.length) return ""; let dd = "M" + x(s[0].d) + "," + y(0) + "L" + x(s[0].d) + "," + y(s[0].sold); for (let i = 1; i < s.length; i++) dd += "L" + x(s[i].d) + "," + y(s[i].sold); return dd; };
+  const cols = ["var(--s2)", "var(--s3)"];
+  pasts.forEach((p, i) => { g += `<path d="${stepPath(p.s)}" fill="none" stroke="${cols[i]}" stroke-width="2" stroke-linejoin="round" opacity=".85"/>`; });
+  if (cur.length) {
+    const area = stepPath(cur) + `L${x(cur[cur.length - 1].d)},${y(0)}Z`;
+    g += `<path d="${area}" fill="var(--s1)" opacity=".10"/><path d="${stepPath(cur)}" fill="none" stroke="var(--s1)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    const lp = cur[cur.length - 1];
+    if (!m.past && m.dNow > 0) g += `<path d="M${x(m.dNow)},${y(m.sold)}L${x(0)},${y(projEnd)}" stroke="var(--s1)" stroke-width="2" stroke-dasharray="3 5" fill="none"/><circle cx="${x(0)}" cy="${y(projEnd)}" r="4" fill="var(--surface)" stroke="var(--s1)" stroke-width="2"/><text x="${x(0) - 8}" y="${y(projEnd) + (projEnd > (m.cap || 0) * .95 ? 16 : -8)}" text-anchor="end" font-size="11.5" fill="var(--ink-2)">Previsión ${int(projEnd)}</text>`;
+    g += `<circle cx="${x(lp.d)}" cy="${y(lp.sold)}" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
+  }
+  g += `<line id="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--ink-3)" stroke-width="1" visibility="hidden"/><rect id="hit" x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent"/>`;
+  svg.innerHTML = g;
+  const lg = [`<span><i style="background:var(--s1)"></i>${esc(ev.name)}</span>`].concat(pasts.map((p, i) => `<span><i style="background:${cols[i]}"></i>${esc(p.ev.name)}</span>`));
+  if (m.cap) lg.push(`<span><i style="background:repeating-linear-gradient(90deg,var(--cap) 0 5px,transparent 5px 8px)"></i>Aforo</span>`);
+  if (!m.past && cur.length && m.dNow > 0) lg.push(`<span><i style="background:repeating-linear-gradient(90deg,var(--s1) 0 3px,transparent 3px 7px)"></i>Previsión</span>`);
+  $("legend").innerHTML = lg.join("");
+  const hit = svg.querySelector("#hit"), xh = svg.querySelector("#xh");
+  const move = e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W;
+    const d = Math.max(0, Math.min(maxD, Math.round(maxD - (px - P.l) / (W - P.l - P.r) * maxD)));
+    xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("visibility", "visible");
+    let h = `<div>${d === 0 ? "Día de la fiesta" : "Faltan " + d + " días"}</div>`;
+    if (cur.length && d >= m.dNow) h += `<div>${esc(ev.name)}: <b>${int(soldAt(cur, d))}</b></div>`;
+    pasts.forEach(p => h += `<div>${esc(p.ev.name)}: <b>${int(soldAt(p.s, d))}</b></div>`);
+    tip.innerHTML = h; tip.style.display = "block";
+    const wr = $("chartWrap").getBoundingClientRect();
+    tip.style.left = Math.min(wr.width - 90, Math.max(90, e.clientX - wr.left + $("chartWrap").scrollLeft)) + "px"; tip.style.top = (e.clientY - wr.top - 12) + "px";
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); });
+}
+
+/* ---------- render ---------- */
+function current() { return events.find(e => e.id === selId); }
+function render() {
+  const real = events.filter(e => !e.example);
+  isExample = real.length === 0;
+  if (isExample) events = exampleEvents();
+  else events = real;
+  if (!current()) {
+    const now = new Date();
+    const upcoming = events.filter(e => evDate(e) > now - DAY).sort((a, b) => evDate(a) - evDate(b));
+    selId = (upcoming[0] || events.slice().sort((a, b) => evDate(b) - evDate(a))[0]).id;
+  }
+  $("exampleBar").hidden = !isExample;
+  $("editBtn").hidden = isExample;
+  $("updatePanel").hidden = isExample;
+  const sel = $("evSel");
+  sel.innerHTML = events.slice().sort((a, b) => evDate(b) - evDate(a)).map(e => `<option value="${esc(e.id)}"${e.id === selId ? " selected" : ""}>${esc(e.name)} · ${evDate(e).toLocaleDateString("es-ES", {day:"numeric", month:"short", year:"2-digit"})}</option>`).join("");
+  const ev = current(), m = metrics(ev), v = verdictOf(m);
+  $("verdict").dataset.tone = v.tone; $("vPill").textContent = v.pill; $("vLine").textContent = v.line; $("vSub").textContent = v.sub;
+
+  const k = [];
+  k.push(`<div class="kpi"><span class="eyebrow">Vendidas</span><span class="v">${int(m.sold)}${m.cap ? ` <small>/ ${int(m.cap)}</small>` : ""}</span>${m.cap ? `<div class="bar"><i style="width:${Math.min(100, m.fill * 100)}%"></i></div><span class="small muted">${pct(m.fill)} del aforo</span>` : ""}</div>`);
+  k.push(`<div class="kpi"><span class="eyebrow">Ingresos</span><span class="v">${eur(m.rev)}</span><span class="small muted">${m.avgPrice ? "Precio medio " + eur(m.avgPrice) : ""}</span></div>`);
+  if (!m.past) {
+    k.push(`<div class="kpi"><span class="eyebrow">Faltan</span><span class="v">${m.daysLeft >= 1 ? Math.floor(m.daysLeft) + " <small>días</small>" : Math.max(0, Math.round(m.daysLeft * 24)) + " <small>horas</small>"}</span><span class="small muted">${evDate(ev).toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"})}</span></div>`);
+    k.push(`<div class="kpi"><span class="eyebrow">Ritmo 7 días</span><span class="v">${m.pace7.toFixed(1).replace(".", ",")} <small>/día</small></span><span class="small muted">Necesitas ${int(m.needed)}/día para llenar</span></div>`);
+    k.push(`<div class="kpi"><span class="eyebrow">Previsión final</span><span class="v">${m.sold ? int(m.cap ? Math.min(m.projected, m.cap) : m.projected) : "—"}</span><span class="small muted">${m.sold ? "≈ " + eur(m.projRev) + " de ingresos" : ""}</span></div>`);
+  }
+  $("kpis").innerHTML = k.join("");
+  drawChart(ev, m);
+
+  const plan = planFor(ev, m);
+  $("planSub").textContent = m.past ? "" : plan.length ? "Próximos " + plan.length + " días" : "";
+  $("plan").innerHTML = m.past ? `<p class="muted small">La fiesta ya pasó.</p>` : plan.map(p => `<div class="day"><div class="when"><b>${esc(fmtDay(p.date))}</b>${p.d === 0 ? "fiesta" : "faltan " + p.d}</div><div class="what"><div><span class="tag">${esc(p.tag)}</span>${esc(p.feed)}</div><div class="small muted">${esc(p.stories)}</div></div></div>`).join("");
+  $("ideas").innerHTML = ideasFor(ev, m).map(t => `<li>${esc(t)}</li>`).join("");
+
+  const ts = ev.tierSold || {}, tiers = (ev.tiers || []).slice();
+  Object.keys(ts).forEach(n => { if (!tiers.find(t => t.name === n)) tiers.push({name:n}); });
+  $("tierSub").textContent = Object.keys(ts).length ? "Según el último Excel" : "Sube el Excel para ver el reparto";
+  $("tiers").innerHTML = tiers.length ? `<thead><tr><th>Tipo</th><th class="r">Precio</th><th class="r">Vendidas</th><th class="r">Cupo</th><th class="r">Ingresos</th></tr></thead><tbody>` + tiers.map(t => { const s = ts[t.name] || {}; return `<tr><td>${esc(t.name)}</td><td class="r num">${t.price ? eur(t.price) : "—"}</td><td class="r num">${int(s.q || 0)}</td><td class="r num">${t.qty ? int(t.qty) : "—"}${t.qty && s.q >= t.qty ? " ✓" : ""}</td><td class="r num">${eur(s.r || 0)}</td></tr>`; }).join("") + "</tbody>" : `<tbody><tr><td class="muted">Añade las tandas en “Editar fiesta” o sube el Excel.</td></tr></tbody>`;
+
+  $("lastUpd").textContent = m.lastUpdate && !isExample ? "Última actualización: " + m.lastUpdate.toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}) : "";
+  $("aiOut").hidden = true; $("aiOut").textContent = "";
+}
+
+/* ---------- event form ---------- */
+let editing = null;
+const toLocalInput = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+function openForm(ev) {
+  editing = ev;
+  $("formPanel").hidden = false; $("formMsg").textContent = ""; $("delConfirm").hidden = true;
+  $("formTitle").textContent = ev ? "Editar fiesta" : "Nueva fiesta";
+  $("delBtn").hidden = !ev;
+  $("fName").value = ev?.name || ""; $("fDate").value = ev ? toLocalInput(evDate(ev)) : "";
+  $("fCap").value = ev?.capacity || ""; $("fFinal").value = ev?.finalSold || "";
+  $("fTiers").value = (ev?.tiers || []).map(t => [t.name, t.price ?? "", t.qty ?? ""].join("; ")).join("\n");
+  $("fNotes").value = ev?.notes || "";
+  $("formPanel").scrollIntoView({behavior:"smooth", block:"start"});
+  $("fName").focus({preventScroll:true});
+}
+$("newBtn").onclick = () => openForm(null);
+const openXls = () => { $("xlsPanel").hidden = false; $("formPanel").hidden = true; $("xlsPanel").scrollIntoView({behavior:"smooth", block:"start"}); };
+$("startBtn").onclick = openXls;
+$("newXlsBtn").onclick = openXls;
+$("xlsClose").onclick = () => { $("xlsPanel").hidden = true; };
+$("editBtn").onclick = () => openForm(current());
+$("cancelBtn").onclick = () => { $("formPanel").hidden = true; };
+$("saveBtn").onclick = async () => {
+  const name = $("fName").value.trim(), date = $("fDate").value, cap = Number($("fCap").value);
+  if (!name || !date || !cap) { $("formMsg").className = "small err"; $("formMsg").textContent = "Falta el nombre, la fecha o el aforo."; return; }
+  const tiers = $("fTiers").value.split("\n").map(l => l.split(/[;|\t]/).map(s => s.trim())).filter(a => a[0]).map(([n, p, q]) => ({name:n, price: parseNum(p) || null, qty: parseNum(q) || null}));
+  const ev = editing ? JSON.parse(JSON.stringify(editing)) : {id: "ev-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), points:{}, tierSold:{}};
+  Object.assign(ev, {name, date: new Date(date).toISOString(), capacity: cap, tiers, notes: $("fNotes").value.trim(), finalSold: parseNum($("fFinal").value) || null});
+  delete ev.example;
+  $("saveBtn").disabled = true;
+  try { await saveEvent(ev); selId = ev.id; $("formPanel").hidden = true; render(); }
+  catch (e) { $("formMsg").className = "small err"; $("formMsg").textContent = "No se pudo guardar (" + (e.code || "error") + "). Prueba otra vez."; }
+  finally { $("saveBtn").disabled = false; }
+};
+$("delBtn").onclick = () => { $("delConfirm").hidden = false; };
+$("delNo").onclick = () => { $("delConfirm").hidden = true; };
+$("delYes").onclick = async () => { await deleteEvent(editing.id); selId = null; $("formPanel").hidden = true; };
+$("evSel").onchange = e => { selId = e.target.value; render(); };
+
+/* ---------- quick update ---------- */
+$("quickBtn").onclick = async () => {
+  const ev = current(); if (!ev || isExample) return;
+  const sold = parseNum($("qSold").value);
+  if (sold == null) { $("quickMsg").className = "small err"; $("quickMsg").textContent = "Escribe cuántas entradas llevas."; return; }
+  const m = metrics(ev);
+  let rev = parseNum($("qRev").value);
+  if (rev == null) rev = m.sold && m.rev ? m.rev + (sold - m.sold) * (m.avgPrice || 0) : 0;
+  const e2 = JSON.parse(JSON.stringify(ev));
+  e2.points = e2.points || {}; e2.points[dayKey(new Date())] = {sold, rev: Math.round(rev * 100) / 100};
+  try { await saveEvent(e2); $("quickMsg").className = "small ok"; $("quickMsg").textContent = "Guardado."; $("qSold").value = ""; $("qRev").value = ""; }
+  catch (e) { $("quickMsg").className = "small err"; $("quickMsg").textContent = "No se pudo guardar (" + (e.code || "error") + ")."; }
+};
+
+/* ---------- Excel import ---------- */
+function parseNum(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return v;
+  let s = String(v).replace(/[€\s]/g, "");
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(/,/g, "");
+  const n = parseFloat(s); return isNaN(n) ? null : n;
+}
+function parseDate(v) {
+  if (v instanceof Date && !isNaN(v)) return v;
+  if (typeof v === "number" && v > 20000 && v < 80000) { const d = XLSX.SSF.parse_date_code(v); return new Date(d.y, d.m - 1, d.d, d.H, d.M); }
+  if (typeof v === "string") {
+    let m = v.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2}))?/);
+    if (m) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)); }
+    m = v.match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+  }
+  return null;
+}
+let sheet = null, sheet2 = null; // {headers, rows, name}
+const GUESS = {
+  Session: [/fecha.*(evento|sesi|fiesta|función)/i, /^sesi[oó]n/i, /sesi[oó]n|función/i],
+  Event: [/nombre.*evento|^evento$|^event$|evento|event name|espect/i],
+  Date: [/fecha.*(compra|venta|pedido|pago)/i, /^fecha$/i, /fecha/i, /date|creado|created/i],
+  Price: [/importe|total|pagado|amount/i, /precio|price/i],
+  Type: [/tipo.*entrada|tarifa|ticket type/i, /tipo|entrada|ticket|categor|zona/i],
+  Qty: [/cantidad|unidades|qty|quantity|n.? ?entradas/i],
+  Status: [/estado|status/i]
+};
+function guess(headers, pats, avoid) { for (const p of pats) { const i = headers.findIndex((h, j) => p.test(h) && !avoid.includes(j)); if (i >= 0) return i; } return -1; }
+async function readSheet(f) {
+  if (typeof XLSX === "undefined") throw new Error("noxlsx");
+  const isText = /\.(csv|txt)$/i.test(f.name);
+  const wb = isText ? XLSX.read(await f.text(), {type:"string", raw:true}) : XLSX.read(await f.arrayBuffer(), {cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+  let hi = arr.findIndex(r => r.filter(c => typeof c === "string" && c.trim()).length >= 3);
+  if (hi < 0) hi = 0;
+  const headers = (arr[hi] || []).map((h, i) => (h == null ? "Columna " + (i + 1) : String(h).trim()));
+  const rows = arr.slice(hi + 1).filter(r => r.some(c => c != null && c !== ""));
+  return {headers, rows, name: f.name.replace(/\.(xlsx?|csv)$/i, "")};
+}
+function fillMapping(prefix, fields, headers) {
+  const used = [];
+  const order = ["Session", "Event", "Date", "Price", "Type", "Qty", "Status"].filter(k => fields.includes(k));
+  for (const k of order) {
+    const g = guess(headers, GUESS[k], used); if (g >= 0) used.push(g);
+    $(prefix + k).innerHTML = `<option value="-1">— ninguna —</option>` + headers.map((h, i) => `<option value="${i}"${i === g ? " selected" : ""}>${esc(h)}</option>`).join("");
+  }
+}
+const col = (prefix, k) => $(prefix + k) ? Number($(prefix + k).value) : -1;
+function aggregate(rows, ix) {
+  const daily = {}, tierSold = {}, sessions = {}; let ok = 0, skipped = 0;
+  for (const r of rows) {
+    if (ix.Status >= 0 && /anul|cancel|devuel|reembol|refund|rechaz/i.test(String(r[ix.Status] ?? ""))) { skipped++; continue; }
+    const d = parseDate(r[ix.Date]); if (!d) { skipped++; continue; }
+    const q = ix.Qty >= 0 ? (parseNum(r[ix.Qty]) ?? 1) : 1;
+    const p = ix.Price >= 0 ? (parseNum(r[ix.Price]) ?? 0) : 0;
+    const k = dayKey(d);
+    daily[k] = daily[k] || {q:0, r:0}; daily[k].q += q; daily[k].r += p;
+    const t = ix.Type >= 0 ? String(r[ix.Type] ?? "Sin tipo").trim() : "General";
+    tierSold[t] = tierSold[t] || {q:0, r:0}; tierSold[t].q += q; tierSold[t].r += p;
+    if (ix.Session >= 0) { const sd = parseDate(r[ix.Session]); if (sd) { const sk = sd.toISOString(); sessions[sk] = (sessions[sk] || 0) + 1; } }
+    ok++;
+  }
+  const keys = Object.keys(daily).sort();
+  const points = {}; let sold = 0, rev = 0;
+  for (const k of keys) { sold += daily[k].q; rev += daily[k].r; points[k] = {sold, rev: Math.round(rev * 100) / 100}; }
+  for (const t in tierSold) tierSold[t].r = Math.round(tierSold[t].r * 100) / 100;
+  const sess = Object.entries(sessions).sort((a, b) => b[1] - a[1])[0];
+  return {points, tierSold, ok, skipped, sold, rev, lastKey: keys[keys.length - 1], firstKey: keys[0], session: sess ? new Date(sess[0]) : null};
+}
+const IX = prefix => Object.fromEntries(Object.keys(GUESS).map(k => [k, col(prefix, k)]));
+
+/* update the selected party */
+async function handleFile(f) {
+  $("importMsg").textContent = ""; $("mapBox").hidden = true;
+  try {
+    sheet = await readSheet(f);
+    fillMapping("m", ["Date", "Price", "Type", "Qty", "Status"], sheet.headers);
+    $("mapInfo").textContent = `${f.name}: ${sheet.rows.length} filas. Revisa que cada dato apunta a su columna. Si no hay columna de cantidad, cuento una entrada por fila.`;
+  } catch (e) { $("mapInfo").textContent = "No he podido leer ese archivo. Prueba con el .xls o .xlsx tal cual lo descarga Entradium."; }
+  $("mapBox").hidden = false;
+}
+function wireDrop(dropId, fileId, fn) {
+  const drop = $(dropId);
+  $(fileId).onchange = e => { const f = e.target.files[0]; if (f) fn(f); };
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) fn(f); });
+}
+wireDrop("drop", "file", handleFile);
+$("importBtn").onclick = async () => {
+  const ev = current(); if (!ev || !sheet) return;
+  const ix = IX("m");
+  if (ix.Date < 0) { $("importMsg").className = "small err"; $("importMsg").textContent = "Elige la columna de fecha."; return; }
+  const a = aggregate(sheet.rows, ix);
+  if (!a.ok) { $("importMsg").className = "small err"; $("importMsg").textContent = "No encontré fechas válidas en esa columna."; return; }
+  const points = a.points;
+  for (const k in (ev.points || {})) if (k > a.lastKey) points[k] = ev.points[k]; // keep quick notes newer than the file
+  const e2 = JSON.parse(JSON.stringify(ev)); e2.points = points; e2.tierSold = a.tierSold; e2.lastImport = {rows: a.ok, skipped: a.skipped, at: new Date().toISOString()};
+  try { await saveEvent(e2); $("importMsg").className = "small ok"; $("importMsg").textContent = `Importadas ${int(a.sold)} entradas (${a.ok} filas${a.skipped ? ", " + a.skipped + " descartadas" : ""}).`; $("mapBox").hidden = true; sheet = null; $("file").value = ""; }
+  catch (e) { $("importMsg").className = "small err"; $("importMsg").textContent = "No se pudo guardar (" + (e.code || "error") + ")."; }
+};
+
+/* create parties from a file */
+let drafts = [];
+function buildDrafts() {
+  const ix = IX("n");
+  if (ix.Date < 0) { $("nList").innerHTML = `<p class="small err">Elige la columna de fecha de compra en “Revisar qué columna es cada dato”.</p>`; drafts = []; return; }
+  const groups = {};
+  for (const r of sheet2.rows) { const g = ix.Event >= 0 ? String(r[ix.Event] ?? "").trim() || sheet2.name : sheet2.name; (groups[g] = groups[g] || []).push(r); }
+  drafts = Object.entries(groups).map(([name, rows]) => {
+    const a = aggregate(rows, ix);
+    const date = a.session || (a.lastKey ? new Date(keyDate(a.lastKey).getTime() + 23.5 * 3600e3) : new Date());
+    const existing = events.find(e => !e.example && e.name.trim().toLowerCase() === name.toLowerCase());
+    const tiers = Object.entries(a.tierSold).sort((x, y) => (x[1].r / x[1].q || 0) - (y[1].r / y[1].q || 0)).map(([n, s]) => ({name: n, price: s.q ? Math.round(s.r / s.q * 100) / 100 : null, qty: null}));
+    return {name, a, date, dateGuessed: !a.session, existing, tiers};
+  }).filter(d => d.a.ok);
+  $("nList").innerHTML = drafts.length ? drafts.map((d, i) => `
+    <div class="kpi" style="gap:10px">
+      <div class="row" style="justify-content:space-between"><b>${d.existing ? "Actualizar" : "Nueva"}: ${esc(d.name)}</b><span class="small muted num">${int(d.a.sold)} entradas · ${eur(d.a.rev)} · ventas del ${esc(fmtDay(keyDate(d.a.firstKey)))} al ${esc(fmtDay(keyDate(d.a.lastKey)))}</span></div>
+      <div class="form">
+        <label>Nombre<input id="nd-name-${i}" value="${esc(d.existing ? d.existing.name : d.name)}"></label>
+        <label>Fecha y hora de la fiesta${d.dateGuessed && !d.existing ? " (revísala)" : ""}<input id="nd-date-${i}" type="datetime-local" value="${toLocalInput(d.existing ? evDate(d.existing) : d.date)}"></label>
+        <label>Aforo<input id="nd-cap-${i}" type="number" min="1" inputmode="numeric" value="${d.existing?.capacity || ""}" placeholder="${new Date(d.date) < new Date() ? "opcional en fiestas pasadas" : "ej. 600"}"></label>
+      </div>
+      <span class="small muted">Tandas: ${d.tiers.map(t => esc(t.name) + (t.price ? " (" + eur(t.price) + ")" : "")).join(", ")}</span>
+    </div>`).join("") : `<p class="small err">No encontré ventas con fecha válida. Revisa las columnas.</p>`;
+  $("nCreate").textContent = drafts.length > 1 ? `Crear ${drafts.length} fiestas` : drafts[0]?.existing ? "Actualizar fiesta" : "Crear fiesta";
+  $("nCreate").disabled = !drafts.length;
+}
+async function handleNewFile(f) {
+  $("nMsg").textContent = "";
+  try {
+    sheet2 = await readSheet(f);
+    fillMapping("n", Object.keys(GUESS), sheet2.headers);
+    $("nMapInfo").textContent = `${f.name}: ${sheet2.rows.length} filas leídas.`;
+    buildDrafts();
+  } catch (e) { $("nMapInfo").textContent = "No he podido leer ese archivo. Prueba con el .xls o .xlsx tal cual lo descarga Entradium."; $("nList").innerHTML = ""; }
+  $("nMapBox").hidden = false;
+}
+wireDrop("drop2", "file2", handleNewFile);
+["nDate", "nPrice", "nType", "nQty", "nStatus", "nEvent", "nSession"].forEach(id => $(id).addEventListener("change", () => sheet2 && buildDrafts()));
+$("nCreate").onclick = async () => {
+  if (!drafts.length) return;
+  const out = [];
+  for (let i = 0; i < drafts.length; i++) {
+    const d = drafts[i];
+    const name = $("nd-name-" + i).value.trim() || d.name, dv = $("nd-date-" + i).value, cap = parseNum($("nd-cap-" + i).value);
+    if (!dv) { $("nMsg").className = "small err"; $("nMsg").textContent = `Falta la fecha de “${name}”.`; return; }
+    const date = new Date(dv);
+    if (!cap && date > new Date()) { $("nMsg").className = "small err"; $("nMsg").textContent = `Pon el aforo de “${name}” para poder hacer la previsión.`; return; }
+    const base = d.existing ? JSON.parse(JSON.stringify(d.existing)) : {id: "ev-" + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6), notes: ""};
+    const points = d.a.points;
+    for (const k in (base.points || {})) if (k > d.a.lastKey) points[k] = base.points[k];
+    const tiers = (base.tiers && base.tiers.length) ? base.tiers : d.tiers;
+    Object.assign(base, {name, date: date.toISOString(), capacity: cap || null, points, tierSold: d.a.tierSold, tiers, lastImport: {rows: d.a.ok, skipped: d.a.skipped, at: new Date().toISOString()}});
+    out.push(base);
+  }
+  $("nCreate").disabled = true;
+  try {
+    for (const ev of out) await saveEvent(ev);
+    const now = new Date(); const next = out.filter(e => new Date(e.date) > now).sort((a, b) => new Date(a.date) - new Date(b.date))[0] || out[0];
+    selId = next.id;
+    $("nMsg").className = "small ok"; $("nMsg").textContent = out.length > 1 ? `${out.length} fiestas guardadas.` : "Fiesta guardada.";
+    $("nMapBox").hidden = true; $("file2").value = ""; sheet2 = null; drafts = [];
+    setTimeout(() => { $("xlsPanel").hidden = true; $("nMsg").textContent = ""; }, 1500);
+    render(); window.scrollTo({top: 0, behavior: "smooth"});
+  } catch (e) { $("nMsg").className = "small err"; $("nMsg").textContent = "No se pudo guardar (" + (e.code || "error") + "). Prueba otra vez."; }
+  finally { $("nCreate").disabled = false; }
+};
+
+/* ---------- Claude advice ---------- */
+let ctl = null;
+function adviceData(ev, m) {
+  const pasts = pastEvents(ev).slice(0, 4).map(e => { const pm = metrics(e); return {nombre:e.name, fecha:evDate(e).toISOString().slice(0, 10), aforo:pm.cap, vendidas:pm.sold, ingresos:Math.round(pm.rev), vendidas_7_dias_antes:soldAt(series(e), 7), vendidas_14_dias_antes:soldAt(series(e), 14)}; });
+  const ser = series(ev).slice(-14).map(p => ({dia:p.k, acumuladas:p.sold}));
+  return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleDateString("es-ES"), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc, tandas:(ev.tiers || []).map(t => ({...t, vendidas:(ev.tierSold || {})[t.name]?.q || 0})), ultimos_dias:ser, fiestas_pasadas:pasts, notas_del_organizador:ev.notes || ""};
+}
+$("aiBtn").onclick = async () => {
+  const ev = current(); const m = metrics(ev);
+  ctl = new AbortController();
+  $("aiBtn").disabled = true; $("aiStop").hidden = false; $("aiOut").hidden = false; $("aiOut").textContent = "Pensando… (puede tardar hasta un minuto)";
+  try {
+    const r = await fetch("/api/advice", {method: "POST", signal: ctl.signal, headers: {"Content-Type": "application/json"}, body: JSON.stringify({data: adviceData(ev, m)})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "No se pudo generar el plan. Prueba otra vez.");
+    $("aiOut").textContent = j.text;
+    $("aiNote").textContent = "Plan generado con tus números de ahora.";
+  } catch (e) {
+    $("aiOut").hidden = true;
+    if (e.name !== "AbortError") $("aiNote").textContent = e.message;
+  } finally { $("aiBtn").disabled = false; $("aiStop").hidden = true; }
+};
+$("aiStop").onclick = () => ctl?.abort();
+
+/* ---------- boot: login ---------- */
+function showApp(on) { $("login").hidden = on; $("app").hidden = !on; }
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("loginBtn").disabled = true; $("loginMsg").textContent = "";
+  try {
+    const j = await api("/api/login", {method: "POST", body: JSON.stringify({user: $("lUser").value, password: $("lPass").value})});
+    me = j.user; $("lPass").value = ""; start();
+  } catch (err) { $("loginMsg").textContent = err.message; }
+  finally { $("loginBtn").disabled = false; }
+});
+$("logoutBtn").onclick = async () => { await api("/api/logout", {method: "POST"}).catch(() => {}); me = null; events = []; lastSig = ""; showApp(false); };
+let poll = null;
+async function start() {
+  showApp(true);
+  $("who").textContent = me;
+  await loadEvents();
+  if (!poll) poll = setInterval(() => { if (me && document.visibilityState === "visible") loadEvents(); }, 30000);
+}
+document.addEventListener("visibilitychange", () => { if (me && document.visibilityState === "visible") loadEvents(); });
+(async () => {
+  try {
+    const j = await api("/api/me");
+    $("aiBox").hidden = !j.ai;
+    if (!j.storage) $("loginMsg").textContent = "Falta conectar la base de datos en Vercel (Storage → Upstash Redis).";
+    if (j.user) { me = j.user; start(); } else showApp(false);
+  } catch (e) { showApp(false); $("loginMsg").textContent = "No se pudo conectar con el servidor."; }
+})();
+})();
+</script>
+</body>
+</html>
