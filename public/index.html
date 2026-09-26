@@ -189,6 +189,7 @@ details.panel[open] > summary::after{content:"－"}
           <label>Tipo de entrada<select id="nType"></select></label>
           <label>Cantidad<select id="nQty"></select></label>
           <label>Estado<select id="nStatus"></select></label>
+          <label>¿Invitación?<select id="nInvite"></select></label>
           <label>Nombre del evento<select id="nEvent"></select></label>
           <label>Fecha del evento<select id="nSession"></select></label>
         </div>
@@ -264,6 +265,7 @@ details.panel[open] > summary::after{content:"－"}
             <label>Tipo de entrada<select id="mType"></select></label>
             <label>Cantidad<select id="mQty"></select></label>
             <label>Estado<select id="mStatus"></select></label>
+            <label>¿Invitación?<select id="mInvite"></select></label>
           </div>
           <div class="row"><button class="primary" id="importBtn">Importar ventas</button><span class="small" id="importMsg"></span></div>
         </div>
@@ -547,7 +549,7 @@ function render() {
   $("verdict").dataset.tone = v.tone; $("vPill").textContent = v.pill; $("vLine").textContent = v.line; $("vSub").textContent = v.sub;
 
   const k = [];
-  k.push(`<div class="kpi"><span class="eyebrow">Vendidas</span><span class="v">${int(m.sold)}${m.cap ? ` <small>/ ${int(m.cap)}</small>` : ""}</span>${m.cap ? `<div class="bar"><i style="width:${Math.min(100, m.fill * 100)}%"></i></div><span class="small muted">${pct(m.fill)} del aforo</span>` : ""}</div>`);
+  k.push(`<div class="kpi"><span class="eyebrow">Vendidas</span><span class="v">${int(m.sold)}${m.cap ? ` <small>/ ${int(m.cap)}</small>` : ""}</span>${m.cap ? `<div class="bar"><i style="width:${Math.min(100, m.fill * 100)}%"></i></div><span class="small muted">${pct(m.fill)} del aforo${ev.invites ? " · + " + int(ev.invites) + " invitaciones" : ""}</span>` : (ev.invites ? `<span class="small muted">+ ${int(ev.invites)} invitaciones</span>` : "")}</div>`);
   k.push(`<div class="kpi"><span class="eyebrow">Ingresos</span><span class="v">${eur(m.rev)}</span><span class="small muted">${m.avgPrice ? "Precio medio " + eur(m.avgPrice) : ""}</span></div>`);
   if (!m.past) {
     k.push(`<div class="kpi"><span class="eyebrow">Faltan</span><span class="v">${m.daysLeft >= 1 ? Math.floor(m.daysLeft) + " <small>días</small>" : Math.max(0, Math.round(m.daysLeft * 24)) + " <small>horas</small>"}</span><span class="small muted">${evDate(ev).toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"})}</span></div>`);
@@ -651,10 +653,21 @@ const GUESS = {
   Date: [/fecha.*(compra|venta|pedido|pago)/i, /^fecha$/i, /fecha/i, /date|creado|created/i],
   Price: [/importe|total|pagado|amount/i, /precio|price/i],
   Type: [/tipo.*entrada|tarifa|ticket type/i, /tipo|entrada|ticket|categor|zona/i],
-  Qty: [/cantidad|unidades|qty|quantity|n.? ?entradas/i],
-  Status: [/estado|status/i]
+  Qty: [/^(cantidad|unidades|uds\.?|qty|quantity|n.? ?entradas|entradas)$/i, /cantidad(?!.*(descuento|dto))/i],
+  Status: [/estado|status/i],
+  Invite: [/invitaci/i]
 };
 function guess(headers, pats, avoid) { for (const p of pats) { const i = headers.findIndex((h, j) => p.test(h) && !avoid.includes(j)); if (i >= 0) return i; } return -1; }
+// Entradium names exports like "listas-saturno-12-09-12092026-2300.xlsx": party name, then date and time.
+function fromFileName(fname) {
+  const base = fname.replace(/\.(xlsx?|csv)$/i, "").replace(/\s*\(\d+\)$|\s+\d+$/, "");
+  const m = base.match(/(\d{2})(\d{2})(20\d{2})-(\d{2})(\d{2})/);
+  const fileDate = m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : null;
+  let name = base.replace(/^listas?[-_ ]/i, "").replace(/[-_ ]?\d{2}-\d{2}-\d{8}-\d{4}.*$/, "").replace(/[-_]+/g, " ").trim() || base;
+  name = name.charAt(0).toUpperCase() + name.slice(1);
+  if (fileDate) name += " " + pad(fileDate.getDate()) + "/" + pad(fileDate.getMonth() + 1);
+  return {name, fileDate};
+}
 async function readSheet(f) {
   if (typeof XLSX === "undefined") throw new Error("noxlsx");
   const isText = /\.(csv|txt)$/i.test(f.name);
@@ -665,11 +678,14 @@ async function readSheet(f) {
   if (hi < 0) hi = 0;
   const headers = (arr[hi] || []).map((h, i) => (h == null ? "Columna " + (i + 1) : String(h).trim()));
   const rows = arr.slice(hi + 1).filter(r => r.some(c => c != null && c !== ""));
-  return {headers, rows, name: f.name.replace(/\.(xlsx?|csv)$/i, "")};
+  // Entradium puts guest-list tickets on a separate "Invitaciones" sheet
+  const invName = wb.SheetNames.find((n, i) => i > 0 && /invitaci/i.test(n));
+  const inviteRows = invName ? XLSX.utils.sheet_to_json(wb.Sheets[invName], {header:1, defval:null}).slice(1).filter(r => r.some(c => c != null && c !== "")).length : 0;
+  return {headers, rows, inviteRows, ...fromFileName(f.name)};
 }
 function fillMapping(prefix, fields, headers) {
   const used = [];
-  const order = ["Session", "Event", "Date", "Price", "Type", "Qty", "Status"].filter(k => fields.includes(k));
+  const order = ["Session", "Event", "Date", "Price", "Type", "Qty", "Status", "Invite"].filter(k => fields.includes(k));
   for (const k of order) {
     const g = guess(headers, GUESS[k], used); if (g >= 0) used.push(g);
     $(prefix + k).innerHTML = `<option value="-1">— ninguna —</option>` + headers.map((h, i) => `<option value="${i}"${i === g ? " selected" : ""}>${esc(h)}</option>`).join("");
@@ -677,11 +693,13 @@ function fillMapping(prefix, fields, headers) {
 }
 const col = (prefix, k) => $(prefix + k) ? Number($(prefix + k).value) : -1;
 function aggregate(rows, ix) {
-  const daily = {}, tierSold = {}, sessions = {}; let ok = 0, skipped = 0;
+  const daily = {}, tierSold = {}, sessions = {}; let ok = 0, skipped = 0, invites = 0;
   for (const r of rows) {
     if (ix.Status >= 0 && /anul|cancel|devuel|reembol|refund|rechaz/i.test(String(r[ix.Status] ?? ""))) { skipped++; continue; }
     const d = parseDate(r[ix.Date]); if (!d) { skipped++; continue; }
-    const q = ix.Qty >= 0 ? (parseNum(r[ix.Qty]) ?? 1) : 1;
+    if (ix.Invite >= 0 && /^s[ií]/i.test(String(r[ix.Invite] ?? "").trim())) { invites++; continue; }
+    const qn = ix.Qty >= 0 && !/€|\$/.test(String(r[ix.Qty] ?? "")) ? parseNum(r[ix.Qty]) : null;
+    const q = qn > 0 && Number.isInteger(qn) ? qn : 1;
     const p = ix.Price >= 0 ? (parseNum(r[ix.Price]) ?? 0) : 0;
     const k = dayKey(d);
     daily[k] = daily[k] || {q:0, r:0}; daily[k].q += q; daily[k].r += p;
@@ -695,7 +713,7 @@ function aggregate(rows, ix) {
   for (const k of keys) { sold += daily[k].q; rev += daily[k].r; points[k] = {sold, rev: Math.round(rev * 100) / 100}; }
   for (const t in tierSold) tierSold[t].r = Math.round(tierSold[t].r * 100) / 100;
   const sess = Object.entries(sessions).sort((a, b) => b[1] - a[1])[0];
-  return {points, tierSold, ok, skipped, sold, rev, lastKey: keys[keys.length - 1], firstKey: keys[0], session: sess ? new Date(sess[0]) : null};
+  return {points, tierSold, ok, skipped, invites, sold, rev, lastKey: keys[keys.length - 1], firstKey: keys[0], session: sess ? new Date(sess[0]) : null};
 }
 const IX = prefix => Object.fromEntries(Object.keys(GUESS).map(k => [k, col(prefix, k)]));
 
@@ -704,7 +722,7 @@ async function handleFile(f) {
   $("importMsg").textContent = ""; $("mapBox").hidden = true;
   try {
     sheet = await readSheet(f);
-    fillMapping("m", ["Date", "Price", "Type", "Qty", "Status"], sheet.headers);
+    fillMapping("m", ["Date", "Price", "Type", "Qty", "Status", "Invite"], sheet.headers);
     $("mapInfo").textContent = `${f.name}: ${sheet.rows.length} filas. Revisa que cada dato apunta a su columna. Si no hay columna de cantidad, cuento una entrada por fila.`;
   } catch (e) { $("mapInfo").textContent = "No he podido leer ese archivo. Prueba con el .xls o .xlsx tal cual lo descarga Entradium."; }
   $("mapBox").hidden = false;
@@ -725,7 +743,7 @@ $("importBtn").onclick = async () => {
   if (!a.ok) { $("importMsg").className = "small err"; $("importMsg").textContent = "No encontré fechas válidas en esa columna."; return; }
   const points = a.points;
   for (const k in (ev.points || {})) if (k > a.lastKey) points[k] = ev.points[k]; // keep quick notes newer than the file
-  const e2 = JSON.parse(JSON.stringify(ev)); e2.points = points; e2.tierSold = a.tierSold; e2.lastImport = {rows: a.ok, skipped: a.skipped, at: new Date().toISOString()};
+  const e2 = JSON.parse(JSON.stringify(ev)); e2.points = points; e2.tierSold = a.tierSold; e2.invites = a.invites + (sheet.inviteRows || 0); e2.lastImport = {rows: a.ok, skipped: a.skipped, at: new Date().toISOString()};
   try { await saveEvent(e2); $("importMsg").className = "small ok"; $("importMsg").textContent = `Importadas ${int(a.sold)} entradas (${a.ok} filas${a.skipped ? ", " + a.skipped + " descartadas" : ""}).`; $("mapBox").hidden = true; sheet = null; $("file").value = ""; }
   catch (e) { $("importMsg").className = "small err"; $("importMsg").textContent = "No se pudo guardar (" + (e.code || "error") + ")."; }
 };
@@ -739,14 +757,15 @@ function buildDrafts() {
   for (const r of sheet2.rows) { const g = ix.Event >= 0 ? String(r[ix.Event] ?? "").trim() || sheet2.name : sheet2.name; (groups[g] = groups[g] || []).push(r); }
   drafts = Object.entries(groups).map(([name, rows]) => {
     const a = aggregate(rows, ix);
-    const date = a.session || (a.lastKey ? new Date(keyDate(a.lastKey).getTime() + 23.5 * 3600e3) : new Date());
+    const date = a.session || sheet2.fileDate || (a.lastKey ? new Date(keyDate(a.lastKey).getTime() + 23.5 * 3600e3) : new Date());
     const existing = events.find(e => !e.example && e.name.trim().toLowerCase() === name.toLowerCase());
     const tiers = Object.entries(a.tierSold).sort((x, y) => (x[1].r / x[1].q || 0) - (y[1].r / y[1].q || 0)).map(([n, s]) => ({name: n, price: s.q ? Math.round(s.r / s.q * 100) / 100 : null, qty: null}));
-    return {name, a, date, dateGuessed: !a.session, existing, tiers};
+    return {name, a, date, dateGuessed: !a.session && !sheet2.fileDate, existing, tiers};
   }).filter(d => d.a.ok);
+  if (drafts.length === 1) drafts[0].a.invites += sheet2.inviteRows || 0;
   $("nList").innerHTML = drafts.length ? drafts.map((d, i) => `
     <div class="kpi" style="gap:10px">
-      <div class="row" style="justify-content:space-between"><b>${d.existing ? "Actualizar" : "Nueva"}: ${esc(d.name)}</b><span class="small muted num">${int(d.a.sold)} entradas · ${eur(d.a.rev)} · ventas del ${esc(fmtDay(keyDate(d.a.firstKey)))} al ${esc(fmtDay(keyDate(d.a.lastKey)))}</span></div>
+      <div class="row" style="justify-content:space-between"><b>${d.existing ? "Actualizar" : "Nueva"}: ${esc(d.name)}</b><span class="small muted num">${int(d.a.sold)} entradas${d.a.invites ? " + " + d.a.invites + " invitaciones" : ""} · ${eur(d.a.rev)} · ventas del ${esc(fmtDay(keyDate(d.a.firstKey)))} al ${esc(fmtDay(keyDate(d.a.lastKey)))}</span></div>
       <div class="form">
         <label>Nombre<input id="nd-name-${i}" value="${esc(d.existing ? d.existing.name : d.name)}"></label>
         <label>Fecha y hora de la fiesta${d.dateGuessed && !d.existing ? " (revísala)" : ""}<input id="nd-date-${i}" type="datetime-local" value="${toLocalInput(d.existing ? evDate(d.existing) : d.date)}"></label>
@@ -768,7 +787,7 @@ async function handleNewFile(f) {
   $("nMapBox").hidden = false;
 }
 wireDrop("drop2", "file2", handleNewFile);
-["nDate", "nPrice", "nType", "nQty", "nStatus", "nEvent", "nSession"].forEach(id => $(id).addEventListener("change", () => sheet2 && buildDrafts()));
+["nDate", "nPrice", "nType", "nQty", "nStatus", "nEvent", "nSession", "nInvite"].forEach(id => $(id).addEventListener("change", () => sheet2 && buildDrafts()));
 $("nCreate").onclick = async () => {
   if (!drafts.length) return;
   const out = [];
@@ -782,7 +801,7 @@ $("nCreate").onclick = async () => {
     const points = d.a.points;
     for (const k in (base.points || {})) if (k > d.a.lastKey) points[k] = base.points[k];
     const tiers = (base.tiers && base.tiers.length) ? base.tiers : d.tiers;
-    Object.assign(base, {name, date: date.toISOString(), capacity: cap || null, points, tierSold: d.a.tierSold, tiers, lastImport: {rows: d.a.ok, skipped: d.a.skipped, at: new Date().toISOString()}});
+    Object.assign(base, {name, date: date.toISOString(), capacity: cap || null, points, tierSold: d.a.tierSold, tiers, invites: d.a.invites || 0, lastImport: {rows: d.a.ok, skipped: d.a.skipped, at: new Date().toISOString()}});
     out.push(base);
   }
   $("nCreate").disabled = true;
