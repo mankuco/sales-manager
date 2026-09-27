@@ -7,7 +7,7 @@ const INSTRUCTIONS = `Eres un experto en marketing de fiestas y ocio nocturno en
 3. Palancas: cuándo y cómo desvelar (o aprovechar) el line-up, cómo usar el cierre del tramo actual y la subida de precio del siguiente (fecha y mensaje de urgencia), y a qué hora y qué días publicar según cuándo compra su público.
 4. Plan día a día hasta la fiesta (máximo 7 días; si faltan más, por semanas): feed, stories y TikTok, con hora de publicación y un texto de ejemplo listo para copiar.
 5. Si hay presupuesto, cómo repartirlo (plataforma, días, público, importe). Si hay relaciones públicas, qué pedirles esta semana.
-No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
+Respeta el estado real: si el line-up está desvelado entero no propongas desvelarlo (propón explotarlo); si es_ultimo_tramo es true no hables de subidas de precio ni cambios de tramo (usa escasez). No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido." });

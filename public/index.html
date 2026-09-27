@@ -531,7 +531,7 @@ function adviceDataFor(ev, m) {
   const tramo = p => p && {nombre:p.name, estado:p.state, precio:p.price, vendidas:p.sold, cupo:p.qty, quedan:p.left, ventas_dia:p.pace && +p.pace.toFixed(1), primera_venta:p.first, ultima_venta:p.last, abre:p.opens};
   const num = v => v === "" || v == null ? null : +v;
   return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"}), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, invitaciones:ev.invites || 0, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc,
-    line_up:{estado:LINEUP_TXT[cx.lineup] || "sin indicar", fecha_proximo_anuncio:cx.lineupNext || null, artistas:cx.artists || null},
+    es_ultimo_tramo:!!(ph.current && !ph.next), line_up:{estado:LINEUP_TXT[cx.lineup] || "sin indicar", fecha_proximo_anuncio:cx.lineupNext || null, artistas:cx.artists || null},
     tramo_actual:tramo(ph.current), siguiente_tramo:tramo(ph.next), tramos:ph.list.map(tramo),
     cuando_compra_el_publico:ins && {mejor_franja:`${ins.bestFrom}:00-${ins.bestTo}:00`, porcentaje_en_esa_franja:Math.round(ins.bestShare * 100), mejores_dias:ins.topDays, porcentaje_con_copa:ins.addonShare != null ? Math.round(ins.addonShare * 100) : null, entradas_por_pedido:ins.avgOrder && +ins.avgOrder.toFixed(2)},
     presupuesto_anuncios_eur:num(cx.budget), relaciones_publicas:num(cx.rrpp), seguidores_instagram:num(cx.ig), seguidores_tiktok:num(cx.tt), acciones_ya_hechas:cx.done || null,
@@ -543,7 +543,7 @@ const ADVICE_INSTRUCTIONS = `Eres un experto en marketing de fiestas y ocio noct
 3. Palancas: cuándo y cómo desvelar (o aprovechar) el line-up, cómo usar el cierre del tramo actual y la subida de precio del siguiente (fecha y mensaje de urgencia), y a qué hora y qué días publicar según cuándo compra su público.
 4. Plan día a día hasta la fiesta (máximo 7 días; si faltan más, por semanas): feed, stories y TikTok, con hora de publicación y un texto de ejemplo listo para copiar.
 5. Si hay presupuesto, cómo repartirlo (plataforma, días, público, importe). Si hay relaciones públicas, qué pedirles esta semana.
-No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
+Respeta el estado real: si el line-up está desvelado entero no propongas desvelarlo (propón explotarlo); si es_ultimo_tramo es true no hables de subidas de precio ni cambios de tramo (usa escasez). No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
 
 /* ---------- social plan ---------- */
 function planFor(ev, m) {
@@ -555,15 +555,19 @@ function planFor(ev, m) {
   const at = ins ? ` Publícalo sobre las ${ins.bestFrom}:00, cuando más compra tu público.` : "";
   const todayKey = dayKey(new Date());
   const addDays = n => dayKey(new Date(startOfDay(new Date()).getTime() + n * DAY));
+  const lu = cx.lineup;
+  const lastPh = !!(ph.current && !ph.next);
+  const artistPost = lu === "full" ? `Presenta a un artista del cartel${cx.artists ? " (" + cx.artists + ")" : ""} con un clip de su set.` : lu === "nolineup" ? "Post del concepto de la fiesta: temática, música y lo que la hace distinta." : "Anuncio del DJ o artista invitado con vídeo corto.";
+  const warmPost = lu === "full" ? "Cartel completo con horarios de cada artista y el enlace." : lu === "nolineup" ? "Post de la temática y la música de la noche." : "Revelar parte del line-up.";
   for (let i = 0; i < days; i++) {
     const d = m.dNow - i;
     const date = new Date(startOfDay(new Date()).getTime() + i * DAY);
     let feed, stories, tag;
     if (d === 0) { tag = "Hoy es"; feed = "Post “Esta noche” con la hora de apertura y el enlace. Recuerda que en taquilla sale más cara."; stories = "Stories cada 2-3 horas: montaje, prueba de sonido, cuenta atrás."; }
     else if (d === 1) { tag = "Última llamada"; feed = "Reel de la última fiesta con el texto “Mañana”. Enlace en bio y en stories."; stories = `Stories con sticker de enlace: quedan ${int(m.remaining)} entradas${m.fill > .6 ? ", menciona que se acaban" : ""}.`; }
-    else if (d <= 3) { tag = "Cuenta atrás"; feed = i % 2 ? "Carrusel con el horario, lineup y precios de cada tanda." : "Reel de 10-15 s con el mejor momento de la última fiesta y “Faltan " + d + " días”."; stories = "Cuenta atrás, encuesta (“¿Con quién vienes?”) y reposts de quien etiquete."; }
-    else if (d <= 7) { tag = "Semana de fiesta"; feed = ["Anuncio del DJ o artista invitado con vídeo corto.", "Sorteo: 2 entradas + mesa, participar = seguir, compartir y etiquetar a 2 amigos.", "Reel de ambiente (público, luces, momentos top).", "Post “Entradas por tandas”: cuándo sube el precio."][i % 4]; stories = "2-3 stories al día con enlace a Entradium."; }
-    else if (d <= 21) { tag = "Calentar"; feed = ["Reel de la última edición.", "Revelar parte del lineup.", "Post con fecha límite del precio actual."][i % 3]; stories = "1-2 stories al día, encuestas y cuenta atrás al cambio de precio."; }
+    else if (d <= 3) { tag = "Cuenta atrás"; feed = i % 2 ? ("Carrusel con el horario" + (lu === "nolineup" ? "" : ", el line-up") + (lastPh ? " y cuántas entradas quedan." : " y los precios de cada tanda.")) : "Reel de 10-15 s con el mejor momento de la última fiesta y “Faltan " + d + " días”."; stories = "Cuenta atrás, encuesta (“¿Con quién vienes?”) y reposts de quien etiquete."; }
+    else if (d <= 7) { tag = "Semana de fiesta"; feed = [artistPost, "Sorteo: 2 entradas + mesa, participar = seguir, compartir y etiquetar a 2 amigos.", "Reel de ambiente (público, luces, momentos top).", (lastPh ? `Post “Últimas entradas”: quedan ${int(m.remaining)} y no hay más tramos.` : "Post “Entradas por tandas”: cuándo sube el precio.")][i % 4]; stories = "2-3 stories al día con enlace a Entradium."; }
+    else if (d <= 21) { tag = "Calentar"; feed = ["Reel de la última edición.", warmPost, (lastPh ? "Post de escasez: cuántas entradas quedan del último tramo." : "Post con fecha límite del precio actual.")][i % 3]; stories = lastPh ? "1-2 stories al día, encuestas y cuántas entradas quedan." : "1-2 stories al día, encuestas y cuenta atrás al cambio de precio."; }
     else { tag = "Anuncio"; feed = ["Cartel oficial con fecha, sitio y enlace.", "Reel resumen de la última fiesta.", "Early bird: cupo limitado."][i % 3]; stories = "1 story al día recordando el early bird."; }
     // line-up is usually the biggest sales trigger: build the week around it
     const dk = addDays(i);
@@ -592,11 +596,12 @@ function planFor(ev, m) {
   return out;
 }
 function ideasFor(ev, m) {
+  const lastPh = (() => { const q = phasesOf(ev); return !!(q.current && !q.next); })();
   const v = verdictOf(m);
   const L = [];
   if (m.past) return ["Sube el Excel final de esta fiesta si no lo has hecho: así la previsión de la próxima será más precisa.", "Guarda los 3 vídeos con más visualizaciones; serán el contenido de la próxima campaña."];
   const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
-  if (cx.lineup === "none" && m.daysLeft > 3) L.push(`El line-up sin anunciar es tu mayor palanca: suele ser el pico de ventas de la campaña. ${cx.lineupNext ? "Lo tienes previsto el " + fmtDM(cx.lineupNext) + "; calienta los 2 días antes con teasers." : "Ponle fecha ya, idealmente antes del próximo cambio de precio."}`);
+  if (cx.lineup === "none" && m.daysLeft > 3) L.push(`El line-up sin anunciar es tu mayor palanca: suele ser el pico de ventas de la campaña. ${cx.lineupNext ? "Lo tienes previsto el " + fmtDM(cx.lineupNext) + "; calienta los 2 días antes con teasers." : (ph.next ? "Ponle fecha ya, idealmente antes del próximo cambio de precio." : "Ponle fecha ya: es lo que más mueve la venta en el último tramo.")}`);
   if (cx.lineup === "partial" && m.daysLeft > 3) L.push("Suelta los nombres de uno en uno, con 2-3 días entre anuncios: cada anuncio es un pico de ventas.");
   if (ph.current) {
     const c = ph.current;
@@ -617,7 +622,7 @@ function ideasFor(ev, m) {
     L.push(ctxOf(ev).budget ? `Anuncio pagado en Instagram con tus ${int(+ctxOf(ev).budget)} €: repártelos en 3-4 días, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.` : "Anuncio pagado pequeño (20-40 €) en Instagram, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.");
   } else if (v.tone === "warn") {
     L.push("Sube la frecuencia de stories a 2-3 al día, siempre con sticker de enlace.");
-    L.push("Anuncia fecha y hora del siguiente cambio de precio: crea urgencia sin bajar precios.");
+    L.push(lastPh ? "Estás en el último tramo: la urgencia ahora es que se acaban, no el precio. Publica cuántas quedan cada 1-2 días." : "Anuncia fecha y hora del siguiente cambio de precio: crea urgencia sin bajar precios.");
     L.push("Publica testimonios o reposts de gente que ya tiene entrada.");
   } else {
     L.push("No bajes precios. Comunica cuántas quedan para acelerar a los indecisos.");
