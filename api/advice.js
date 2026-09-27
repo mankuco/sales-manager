@@ -1,11 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { requireUser, sameOrigin } from "../lib/auth.js";
 
-const INSTRUCTIONS = `Eres un experto en marketing de fiestas y ocio nocturno en España. Un organizador vende entradas en Entradium. Con estos datos, dile en español, de tú y directo:
-1. Diagnóstico en 2 frases: ¿va bien o tiene que apretar en redes? Justifícalo con los números.
-2. Plan día a día hasta la fiesta (máximo 7 días; si faltan más, por semanas): qué publicar en feed, stories y TikTok cada día, con ideas concretas de contenido y textos de ejemplo.
-3. Tres acciones extra de alto impacto (relaciones públicas, sorteos, anuncios pagados con presupuesto orientativo, precios/tandas).
-Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
+const INSTRUCTIONS = `Eres un experto en marketing de fiestas y ocio nocturno en España. Un organizador vende entradas en Entradium. Con estos datos, dile en español, de tú y directo, qué hacer para vender más entradas. Nada genérico: cada consejo tiene que salir de un dato de abajo (line-up, tramo actual y cuántas quedan, siguiente tramo y su precio, franja y días en que compra su público, presupuesto, relaciones públicas, lo que ya ha hecho). Si falta un dato clave, dilo en una línea y sigue.
+1. Diagnóstico en 2 frases con números: ¿llega al aforo? ¿qué es lo que más está frenando o empujando la venta?
+2. Las 3 prioridades de hoy, en orden, cada una con el porqué en números.
+3. Palancas: cuándo y cómo desvelar (o aprovechar) el line-up, cómo usar el cierre del tramo actual y la subida de precio del siguiente (fecha y mensaje de urgencia), y a qué hora y qué días publicar según cuándo compra su público.
+4. Plan día a día hasta la fiesta (máximo 7 días; si faltan más, por semanas): feed, stories y TikTok, con hora de publicación y un texto de ejemplo listo para copiar.
+5. Si hay presupuesto, cómo repartirlo (plataforma, días, público, importe). Si hay relaciones públicas, qué pedirles esta semana.
+No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido." });

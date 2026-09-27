@@ -127,6 +127,13 @@ td.r,th.r{text-align:right}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
 .mapping{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
 .note{font-size:13px;color:var(--ink-2)}
+.camp{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.camp .kpi{gap:6px}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);width:fit-content}
+.chip.good{background:var(--good-soft);color:var(--good)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)} .chip.info{background:var(--accent-soft);color:var(--accent)}
+.phase-ed input,.phase-ed select{padding:6px 8px}
+.phase-ed td{padding:4px}
+.fset{grid-column:1/-1;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px}
 .login{min-height:80vh;display:grid;place-items:center}
 .login-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px}
 .ok{color:var(--good)} .err{color:var(--bad)}
@@ -190,6 +197,7 @@ details.panel[open] > summary::after{content:"－"}
           <label>Cantidad<select id="nQty"></select></label>
           <label>Estado<select id="nStatus"></select></label>
           <label>¿Invitación?<select id="nInvite"></select></label>
+          <label>Nº de pedido<select id="nOrder"></select></label>
           <label>Nombre del evento<select id="nEvent"></select></label>
           <label>Fecha del evento<select id="nSession"></select></label>
         </div>
@@ -208,6 +216,12 @@ details.panel[open] > summary::after{content:"－"}
   </section>
 
   <section class="kpis" id="kpis"></section>
+
+  <section class="panel" id="campPanel">
+    <div class="panel-head"><h2>Situación de la campaña</h2><button id="campEdit">Completar ficha</button></div>
+    <div class="camp" id="camp"></div>
+    <p class="small muted" id="campHint"></p>
+  </section>
 
   <section class="panel">
     <div class="panel-head">
@@ -238,7 +252,7 @@ details.panel[open] > summary::after{content:"－"}
   </div>
 
   <section class="panel">
-    <div class="panel-head"><h2>Entradas por tipo</h2><span class="small muted" id="tierSub"></span></div>
+    <div class="panel-head"><h2>Tramos</h2><span class="small muted" id="tierSub"></span></div>
     <div class="tablewrap"><table id="tiers"></table></div>
   </section>
 
@@ -266,6 +280,7 @@ details.panel[open] > summary::after{content:"－"}
             <label>Cantidad<select id="mQty"></select></label>
             <label>Estado<select id="mStatus"></select></label>
             <label>¿Invitación?<select id="mInvite"></select></label>
+            <label>Nº de pedido<select id="mOrder"></select></label>
           </div>
           <div class="row"><button class="primary" id="importBtn">Importar ventas</button><span class="small" id="importMsg"></span></div>
         </div>
@@ -289,8 +304,26 @@ details.panel[open] > summary::after{content:"－"}
       <label>Fecha y hora<input id="fDate" type="datetime-local"></label>
       <label>Aforo<input id="fCap" type="number" min="1" inputmode="numeric"></label>
       <label>Ventas finales (solo fiestas pasadas sin Excel)<input id="fFinal" type="number" min="0" inputmode="numeric" placeholder="opcional"></label>
-      <label class="full">Tandas de entradas, una por línea: nombre; precio; cupo<textarea id="fTiers" placeholder="Early bird; 10; 150&#10;Segunda tanda; 14; 250&#10;Última tanda; 18; 200"></textarea></label>
-      <label class="full">Notas para los consejos: estilo de fiesta, público, redes que usas, seguidores<textarea id="fNotes" placeholder="Reggaeton y comercial, público 18-25, Instagram 4.200 seguidores y TikTok, hacemos sorteos de mesa…"></textarea></label>
+      <div class="fset">
+        <h3>Tramos de precio</h3>
+        <p class="note">Los que ya han vendido salen del Excel. Añade los que quedan por abrir, con su precio y cuándo abren. El cupo es cuántas entradas tiene cada tramo; sin él no puedo avisarte de cuándo se acaba.</p>
+        <div class="tablewrap"><table class="phase-ed"><thead><tr><th>Tramo</th><th>Precio €</th><th>Cupo</th><th>Estado</th><th>Abre el</th><th></th></tr></thead><tbody id="phaseRows"></tbody></table></div>
+        <div><button id="addPhase" type="button">Añadir tramo</button></div>
+      </div>
+      <div class="fset">
+        <h3>Line-up y campaña</h3>
+        <div class="form">
+          <label>Line-up<select id="fLineup"><option value="">— sin decir —</option><option value="none">Sin anunciar todavía</option><option value="partial">Anunciado en parte</option><option value="full">Completo y anunciado</option><option value="nolineup">Esta fiesta no tiene artistas</option></select></label>
+          <label>Próximo anuncio de artistas<input id="fLineupNext" type="date"></label>
+          <label class="full">Artistas (anunciados o por anunciar)<input id="fArtists" placeholder="Ej. DJ Nano (anunciado), sorpresa por confirmar"></label>
+          <label>Presupuesto para anuncios (€)<input id="fBudget" type="number" min="0" inputmode="numeric" placeholder="0 si no hay"></label>
+          <label>Relaciones públicas vendiendo<input id="fRrpp" type="number" min="0" inputmode="numeric" placeholder="nº de personas"></label>
+          <label>Seguidores Instagram<input id="fIg" type="number" min="0" inputmode="numeric"></label>
+          <label>Seguidores TikTok<input id="fTt" type="number" min="0" inputmode="numeric"></label>
+          <label class="full">Lo que ya has hecho (posts, sorteos, anuncios…)<textarea id="fDone" placeholder="Cartel el 20/08, reel de la edición anterior el 28/08, sorteo de 2 entradas la semana pasada…"></textarea></label>
+          <label class="full">Notas: estilo de fiesta, público, sala, lo que suele funcionarte<textarea id="fNotes" placeholder="Techno y house, público 20-28, sala de 400, los reels de ambiente funcionan mejor que los carteles…"></textarea></label>
+        </div>
+      </div>
     </div>
     <div class="row">
       <button class="primary" id="saveBtn">Guardar</button>
@@ -415,8 +448,8 @@ function metrics(ev) {
   const fr = fracAt(ev, dNow);
   const projected = sold > 0 ? Math.round(sold / Math.max(fr.f, .05)) : 0;
   const avgPrice = sold ? rev / sold : null;
-  const tierPrices = (ev.tiers || []).map(t => t.price).filter(Boolean);
-  const nextPrice = tierPrices.length ? tierPrices[tierPrices.length - 1] : avgPrice;
+  const ph = phasesOf(ev);
+  const nextPrice = (ph.current && ph.current.price) || (ph.next && ph.next.price) || avgPrice;
   const projRev = projected > sold ? rev + (Math.min(projected, cap || projected) - sold) * (nextPrice || avgPrice || 0) : rev;
   const lastUpdate = ev.updatedAt ? new Date(ev.updatedAt) : null;
   return {sold, rev, cap, daysLeft, dNow, pace7, remaining, needed, projected, projRev, avgPrice, frSrc: fr.src, frac: fr.f, ratio: cap ? projected / cap : null, fill: cap ? sold / cap : null, lastUpdate, past: daysLeft < -0.5};
@@ -433,13 +466,95 @@ function verdictOf(m) {
   return {tone:"bad", pill:"Aprieta en redes", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Necesitas ${int(m.needed)} ventas al día y vas a ${m.pace7.toFixed(1).replace(".", ",")}.`, sub:`Previsión basada en ${m.frSrc}.`};
 }
 
+/* ---------- campaign context ---------- */
+// "TRAMO 3 - SAVER - Entrada Saturno + Copa" -> "TRAMO 3 - SAVER"; "EARLY - Entrada X" -> "EARLY"
+const phaseOf = t => (String(t).split(/\s+-\s+(?=entrada\b)/i)[0].replace(/\s*\+.*$/, "").trim() || String(t));
+const isAddon = t => /copa|cerveza|bebida|consumici|\+/i.test(t);
+const fmtDM = k => { const d = keyDate(k); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1); };
+function phasesOf(ev) {
+  const ts = ev.tierSold || {}, td = ev.tierDates || {};
+  const map = new Map();
+  for (const [t, v] of Object.entries(ts)) {
+    const n = phaseOf(t); const ph = map.get(n) || {name:n, sold:0, rev:0, first:null, last:null, minPrice:null, fromSales:true};
+    ph.sold += v.q; ph.rev += v.r;
+    const unit = v.q ? v.r / v.q : null;
+    if (unit != null && (ph.minPrice == null || unit < ph.minPrice)) ph.minPrice = Math.round(unit * 100) / 100;
+    const dts = td[t]; if (dts) { if (!ph.first || dts.first < ph.first) ph.first = dts.first; if (!ph.last || dts.last > ph.last) ph.last = dts.last; }
+    map.set(n, ph);
+  }
+  const manual = ev.phases || (ev.tiers || []).map(t => ({name: t.name, price: t.price, qty: t.qty}));
+  for (const mp of manual) {
+    const key = [...map.keys()].find(k => k.toLowerCase() === String(mp.name).toLowerCase()) || mp.name;
+    const ph = map.get(key) || {name: mp.name, sold: 0, rev: 0, first: null, last: null, minPrice: null};
+    Object.assign(ph, {price: mp.price ?? null, qty: mp.qty ?? null, status: mp.status || "auto", opens: mp.opens || null});
+    map.set(key, ph);
+  }
+  const list = [...map.values()].sort((a, b) => (a.first || "9999") < (b.first || "9999") ? -1 : (a.first || "9999") > (b.first || "9999") ? 1 : (a.opens || "9999") < (b.opens || "9999") ? -1 : 1);
+  const lastAll = list.reduce((mx, p) => p.last && p.last > mx ? p.last : mx, "");
+  const lastTs = lastAll ? keyDate(lastAll).getTime() : 0;
+  const activeLast = list.filter(p => p.last && keyDate(p.last).getTime() >= lastTs - 2 * DAY).pop();
+  for (const p of list) {
+    p.price = p.price ?? p.minPrice;
+    let st = p.status && p.status !== "auto" ? p.status : null;
+    if (!st) {
+      if (p.qty && p.sold >= p.qty) st = "agotado";
+      else if (p === activeLast) st = "activo";
+      else if (p.sold > 0) st = "cerrado";
+      else st = "por abrir";
+    }
+    p.state = st;
+    p.left = p.qty ? Math.max(0, p.qty - p.sold) : null;
+    const span = p.first && p.last ? Math.max(1, Math.round((keyDate(p.last) - keyDate(p.first)) / DAY) + 1) : null;
+    p.pace = span ? p.sold / span : null;
+  }
+  const current = list.filter(p => p.state === "activo").pop() || null;
+  const ci = current ? list.indexOf(current) : -1;
+  const next = list.find((p, i) => i > ci && p.state === "por abrir") || null;
+  return {list, current, next};
+}
+function insightsOf(ev) {
+  const ins = ev.insights; if (!ins || !ins.byHour) return null;
+  const tot = ins.byHour.reduce((a, b) => a + b, 0) || 1;
+  // best 3-hour window
+  let best = 0, bh = 0;
+  for (let h = 0; h < 24; h++) { const v = ins.byHour[h] + ins.byHour[(h + 1) % 24] + ins.byHour[(h + 2) % 24]; if (v > best) { best = v; bh = h; } }
+  const days = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const wd = ins.byWeekday.map((v, i) => ({v, d: days[i]})).sort((a, b) => b.v - a.v);
+  return {bestFrom: bh, bestTo: (bh + 3) % 24, bestShare: best / tot, topDays: wd.slice(0, 2).map(x => x.d), topDayShare: (wd[0].v + wd[1].v) / tot, addonShare: ins.addonShare, avgOrder: ins.avgOrder, orders: ins.orders};
+}
+const ctxOf = ev => ev.ctx || {};
+const LINEUP_TXT = {none:"no desvelado", partial:"desvelado en parte", full:"desvelado entero", nolineup:"fiesta sin line-up"};
+function adviceDataFor(ev, m) {
+  const pasts = pastEvents(ev).slice(0, 4).map(e => { const pm = metrics(e); return {nombre:e.name, fecha:evDate(e).toISOString().slice(0, 10), aforo:pm.cap, vendidas:pm.sold, ingresos:Math.round(pm.rev), vendidas_7_dias_antes:soldAt(series(e), 7), vendidas_14_dias_antes:soldAt(series(e), 14)}; });
+  const ser = series(ev).slice(-14).map(p => ({dia:p.k, acumuladas:p.sold}));
+  const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
+  const tramo = p => p && {nombre:p.name, estado:p.state, precio:p.price, vendidas:p.sold, cupo:p.qty, quedan:p.left, ventas_dia:p.pace && +p.pace.toFixed(1), primera_venta:p.first, ultima_venta:p.last, abre:p.opens};
+  const num = v => v === "" || v == null ? null : +v;
+  return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"}), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, invitaciones:ev.invites || 0, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc,
+    line_up:{estado:LINEUP_TXT[cx.lineup] || "sin indicar", fecha_proximo_anuncio:cx.lineupNext || null, artistas:cx.artists || null},
+    tramo_actual:tramo(ph.current), siguiente_tramo:tramo(ph.next), tramos:ph.list.map(tramo),
+    cuando_compra_el_publico:ins && {mejor_franja:`${ins.bestFrom}:00-${ins.bestTo}:00`, porcentaje_en_esa_franja:Math.round(ins.bestShare * 100), mejores_dias:ins.topDays, porcentaje_con_copa:ins.addonShare != null ? Math.round(ins.addonShare * 100) : null, entradas_por_pedido:ins.avgOrder && +ins.avgOrder.toFixed(2)},
+    presupuesto_anuncios_eur:num(cx.budget), relaciones_publicas:num(cx.rrpp), seguidores_instagram:num(cx.ig), seguidores_tiktok:num(cx.tt), acciones_ya_hechas:cx.done || null,
+    ultimos_dias:ser, fiestas_pasadas:pasts, notas_del_organizador:ev.notes || ""};
+}
+const ADVICE_INSTRUCTIONS = `Eres un experto en marketing de fiestas y ocio nocturno en España. Un organizador vende entradas en Entradium. Con estos datos, dile en español, de tú y directo, qué hacer para vender más entradas. Nada genérico: cada consejo tiene que salir de un dato de abajo (line-up, tramo actual y cuántas quedan, siguiente tramo y su precio, franja y días en que compra su público, presupuesto, relaciones públicas, lo que ya ha hecho). Si falta un dato clave, dilo en una línea y sigue.
+1. Diagnóstico en 2 frases con números: ¿llega al aforo? ¿qué es lo que más está frenando o empujando la venta?
+2. Las 3 prioridades de hoy, en orden, cada una con el porqué en números.
+3. Palancas: cuándo y cómo desvelar (o aprovechar) el line-up, cómo usar el cierre del tramo actual y la subida de precio del siguiente (fecha y mensaje de urgencia), y a qué hora y qué días publicar según cuándo compra su público.
+4. Plan día a día hasta la fiesta (máximo 7 días; si faltan más, por semanas): feed, stories y TikTok, con hora de publicación y un texto de ejemplo listo para copiar.
+5. Si hay presupuesto, cómo repartirlo (plataforma, días, público, importe). Si hay relaciones públicas, qué pedirles esta semana.
+No repitas lo que ya ha hecho salvo para mejorarlo. Sin relleno. Usa listas cortas. Texto plano, sin tablas. No inventes datos que no estén aquí.`;
+
 /* ---------- social plan ---------- */
 function planFor(ev, m) {
   const tone = verdictOf(m).tone;
   const push = tone === "bad" ? 2 : tone === "warn" ? 1 : 0;
   const days = Math.min(7, Math.max(0, m.dNow) + 1);
   const out = [];
-  const tierLeft = (ev.tiers || []).find(t => ((ev.tierSold || {})[t.name]?.q || 0) < t.qty);
+  const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
+  const at = ins ? ` Publícalo sobre las ${ins.bestFrom}:00, cuando más compra tu público.` : "";
+  const todayKey = dayKey(new Date());
+  const addDays = n => dayKey(new Date(startOfDay(new Date()).getTime() + n * DAY));
   for (let i = 0; i < days; i++) {
     const d = m.dNow - i;
     const date = new Date(startOfDay(new Date()).getTime() + i * DAY);
@@ -450,9 +565,28 @@ function planFor(ev, m) {
     else if (d <= 7) { tag = "Semana de fiesta"; feed = ["Anuncio del DJ o artista invitado con vídeo corto.", "Sorteo: 2 entradas + mesa, participar = seguir, compartir y etiquetar a 2 amigos.", "Reel de ambiente (público, luces, momentos top).", "Post “Entradas por tandas”: cuándo sube el precio."][i % 4]; stories = "2-3 stories al día con enlace a Entradium."; }
     else if (d <= 21) { tag = "Calentar"; feed = ["Reel de la última edición.", "Revelar parte del lineup.", "Post con fecha límite del precio actual."][i % 3]; stories = "1-2 stories al día, encuestas y cuenta atrás al cambio de precio."; }
     else { tag = "Anuncio"; feed = ["Cartel oficial con fecha, sitio y enlace.", "Reel resumen de la última fiesta.", "Early bird: cupo limitado."][i % 3]; stories = "1 story al día recordando el early bird."; }
-    if (push >= 1 && d > 0 && d <= 10 && i % 3 === 0) stories += " Pide a relaciones públicas y amigos que lo compartan.";
-    if (push === 2 && d > 1 && i === 0) feed += " Considera 20-40 € en anuncio de Instagram segmentado por ciudad y edad.";
-    if (tierLeft && d > 1 && i === 1 && push) stories += ` Avisa de que la tanda “${tierLeft.name}” se acaba.`;
+    // line-up is usually the biggest sales trigger: build the week around it
+    const dk = addDays(i);
+    if (d > 1 && (cx.lineup === "none" || cx.lineup === "partial")) {
+      if (cx.lineupNext && dk === cx.lineupNext) { tag = "Anuncio line-up"; feed = `Revela ${cx.lineup === "none" ? "el line-up" : "el siguiente artista"} con vídeo del artista y el enlace en la primera línea.` + at; stories = "Cuenta atrás desde por la mañana, repost de lo que compartan los artistas y sticker de enlace."; }
+      else if (cx.lineupNext && dk === addDays(-1 + Math.round((keyDate(cx.lineupNext) - startOfDay(new Date())) / DAY)) && dk < cx.lineupNext) { tag = "Teaser"; feed = "Teaser del line-up: silueta o pista del artista y “mañana lo desvelamos”."; stories = "Encuesta “¿Quién crees que viene?” y cuenta atrás para el anuncio."; }
+      else if (!cx.lineupNext && i === 0 && d > 3) { tag = "Line-up"; feed = `Todavía no has ${cx.lineup === "none" ? "anunciado el line-up" : "cerrado el line-up"}: pon fecha al anuncio esta semana y avisa en stories de que llega.`; }
+    } else if (cx.lineup === "full" && d > 1 && d <= 10 && i % 3 === 1) {
+      feed = `Contenido del artista${cx.artists ? " (" + cx.artists + ")" : ""}: clip de un set, mensaje suyo invitando a venir o horario de su sesión.`;
+    }
+    // price changes create urgency
+    if (ph.next && ph.next.opens && d > 0) {
+      const toOpen = Math.round((keyDate(ph.next.opens) - keyDate(dk)) / DAY);
+      const now = ph.current && ph.current.price ? eur(ph.current.price) : "el precio actual";
+      if (toOpen === 2 || toOpen === 1) { tag = "Sube el precio"; feed = `Últimas ${toOpen * 24} horas a ${now}: el ${fmtDM(ph.next.opens)} pasa a ${ph.next.price ? eur(ph.next.price) : "más caro"}.` + at; stories = "Cuenta atrás al cambio de precio con sticker de enlace, 2-3 veces al día."; }
+      else if (toOpen === 0) { tag = "Nuevo tramo"; feed = `Abre ${ph.next.name}${ph.next.price ? " a " + eur(ph.next.price) : ""}. Recuerda quién entró antes y ahorró.`; }
+    }
+    if (ph.current && ph.current.left != null && ph.current.qty && ph.current.left / ph.current.qty < .25 && d > 0 && i === 0) {
+      stories = `Quedan ${int(ph.current.left)} entradas de ${ph.current.name}${ph.current.price ? " a " + eur(ph.current.price) : ""}. Dilo con número exacto. ` + stories;
+    }
+    if (push >= 1 && d > 0 && d <= 10 && i % 3 === 0) stories += cx.rrpp ? ` Pásales a tus ${cx.rrpp} relaciones públicas el post del día para que lo compartan.` : " Pide a amigos y habituales que lo compartan.";
+    if (push === 2 && d > 1 && i === 0) feed += cx.budget ? ` Mete ${Math.max(10, Math.round(cx.budget * .3))} € de tu presupuesto en promocionar este post (ciudad + edad de tu público).` : " Si puedes, 20-40 € en promocionar este post (ciudad + edad de tu público).";
+    if (at && !feed.includes("Publícalo")) feed += at;
     out.push({date, d, tag, feed, stories});
   }
   return out;
@@ -461,22 +595,57 @@ function ideasFor(ev, m) {
   const v = verdictOf(m);
   const L = [];
   if (m.past) return ["Sube el Excel final de esta fiesta si no lo has hecho: así la previsión de la próxima será más precisa.", "Guarda los 3 vídeos con más visualizaciones; serán el contenido de la próxima campaña."];
+  const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
+  if (cx.lineup === "none" && m.daysLeft > 3) L.push(`El line-up sin anunciar es tu mayor palanca: suele ser el pico de ventas de la campaña. ${cx.lineupNext ? "Lo tienes previsto el " + fmtDM(cx.lineupNext) + "; calienta los 2 días antes con teasers." : "Ponle fecha ya, idealmente antes del próximo cambio de precio."}`);
+  if (cx.lineup === "partial" && m.daysLeft > 3) L.push("Suelta los nombres de uno en uno, con 2-3 días entre anuncios: cada anuncio es un pico de ventas.");
+  if (ph.current) {
+    const c = ph.current;
+    if (c.left != null) L.push(`Estás en ${c.name}: quedan ${int(c.left)} de ${int(c.qty)}${c.price ? " a " + eur(c.price) : ""}. ${c.pace ? "Al ritmo del tramo (" + c.pace.toFixed(1).replace(".", ",") + "/día) se acaba en unos " + Math.max(1, Math.round(c.left / Math.max(c.pace, .1))) + " días." : ""} Publica el número exacto que queda: la escasez concreta convierte más que “últimas entradas”.`);
+    else L.push(`Estás en ${c.name}. Añade su cupo en la ficha para que te avise de cuándo se acaba y puedas usarlo como urgencia.`);
+  }
+  if (ph.next) L.push(`Siguiente: ${ph.next.name}${ph.next.price ? " a " + eur(ph.next.price) : ""}${ph.next.opens ? ", abre el " + fmtDM(ph.next.opens) : ""}. Anuncia la subida 48 h antes con la diferencia de precio en grande.`);
+  else if (ph.current && ph.list.length > 1) L.push("No hay más tramos por abrir: a partir de aquí el mensaje no es precio sino escasez y ambiente.");
+  if (ins) {
+    L.push(`Tu público compra sobre todo entre las ${ins.bestFrom}:00 y las ${ins.bestTo}:00 (${pct(ins.bestShare)} de las ventas) y los ${ins.topDays.join(" y ")}. Programa ahí los posts con enlace.`);
+    if (ins.addonShare != null && ins.addonShare < .35) L.push(`Solo el ${pct(ins.addonShare)} compra la entrada con copa. Destácala en stories como la opción que sale más a cuenta: sube el ingreso por persona sin vender más entradas.`);
+    if (ins.avgOrder && ins.avgOrder >= 1.8) L.push(`De media se compran ${ins.avgOrder.toFixed(1).replace(".", ",")} entradas por pedido: vendes a grupos. Usa mensajes para quedar con amigos (“etiqueta a tu grupo”) y valora un pack de 4.`);
+  }
   if (v.tone === "bad") {
     L.push("Publica ya un reel con el mejor momento de la última fiesta. Es lo que más vende en fiestas: la gente compra el ambiente.");
     L.push("Haz un sorteo de entradas o de una mesa: dispara el alcance en 48 horas.");
     L.push("Activa a tus relaciones públicas con un código o enlace propio y un premio para quien más venda.");
-    L.push("Anuncio pagado pequeño (20-40 €) en Instagram, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.");
+    L.push(ctxOf(ev).budget ? `Anuncio pagado en Instagram con tus ${int(+ctxOf(ev).budget)} €: repártelos en 3-4 días, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.` : "Anuncio pagado pequeño (20-40 €) en Instagram, radio de 15 km, edad de tu público, con el reel que mejor haya funcionado.");
   } else if (v.tone === "warn") {
     L.push("Sube la frecuencia de stories a 2-3 al día, siempre con sticker de enlace.");
     L.push("Anuncia fecha y hora del siguiente cambio de precio: crea urgencia sin bajar precios.");
     L.push("Publica testimonios o reposts de gente que ya tiene entrada.");
   } else {
     L.push("No bajes precios. Comunica cuántas quedan para acelerar a los indecisos.");
-    L.push("Guarda el presupuesto de anuncios para la próxima fiesta.");
+    const cxb = ctxOf(ev), bud = +cxb.budget || 0;
+    if (bud && (cxb.lineup === "none" || cxb.lineup === "partial") && cxb.lineupNext) L.push(`No gastes aún en anuncios: guarda los ${int(bud)} € para promocionar el post del line-up el ${fmtDM(cxb.lineupNext)}, que es cuando más convierte.`);
+    else L.push(bud ? `Vas bien sin anuncios: guarda los ${int(bud)} € para los 2 últimos días si el ritmo baja.` : "Guarda el presupuesto de anuncios para la próxima fiesta.");
   }
   if (m.daysLeft <= 3 && m.daysLeft > 0) L.push("Estos días la mayoría compra a última hora: stories con enlace varias veces al día.");
   if (m.fill > .7) L.push(`Mensaje de escasez: “Quedan ${int(m.remaining)} entradas”.`);
   return L;
+}
+
+function renderCampaign(ev, m) {
+  const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
+  const L = {none:["Sin anunciar","warn"], partial:["Anunciado en parte","info"], full:["Completo","good"], nolineup:["Sin artistas",""]};
+  const lu = L[cx.lineup];
+  const cards = [];
+  cards.push(`<div class="kpi"><span class="eyebrow">Line-up</span>${lu ? `<span class="chip ${lu[1]}">${lu[0]}</span>` : `<span class="small muted">Sin rellenar</span>`}<span class="small muted">${cx.lineupNext ? "Próximo anuncio: " + fmtDM(cx.lineupNext) : cx.artists ? esc(cx.artists) : ""}</span></div>`);
+  const c = ph.current;
+  cards.push(`<div class="kpi"><span class="eyebrow">Tramo actual</span>${c ? `<b>${esc(c.name)}</b><span class="small muted">${c.price ? eur(c.price) + " · " : ""}${int(c.sold)} vendidas${c.qty ? " de " + int(c.qty) + " · quedan " + int(c.left) : ""}${c.pace ? " · " + c.pace.toFixed(1).replace(".", ",") + "/día" : ""}</span>${c.qty ? `<div class="bar"><i style="width:${Math.min(100, c.sold / c.qty * 100)}%"></i></div>` : ""}` : `<span class="small muted">Sube el Excel para detectarlo</span>`}</div>`);
+  const n = ph.next;
+  cards.push(`<div class="kpi"><span class="eyebrow">Siguiente tramo</span>${n ? `<b>${esc(n.name)}</b><span class="small muted">${n.price ? eur(n.price) : "precio sin poner"}${n.opens ? " · abre el " + fmtDM(n.opens) : ""}</span>` : `<span class="small muted">${ph.list.length ? "No hay más tramos por abrir" : "—"}</span>`}</div>`);
+  if (ins) cards.push(`<div class="kpi"><span class="eyebrow">Cuándo compran</span><b>${ins.bestFrom}:00–${ins.bestTo}:00</b><span class="small muted">${pct(ins.bestShare)} de las ventas · sobre todo ${ins.topDays.join(" y ")}${ins.addonShare != null ? " · " + pct(ins.addonShare) + " con copa" : ""}</span></div>`);
+  $("camp").innerHTML = cards.join("");
+  const missing = [!cx.lineup && "el line-up", !(ev.phases || []).some(p => p.qty) && "el cupo de cada tramo", cx.budget == null && "el presupuesto"].filter(Boolean);
+  $("campHint").textContent = !isExample && !m.past && missing.length ? "Para afinar los consejos falta: " + missing.join(", ") + "." : "";
+  $("campEdit").hidden = isExample;
+  $("campEdit").textContent = missing.length ? "Completar ficha" : "Editar ficha";
 }
 
 /* ---------- chart ---------- */
@@ -564,10 +733,11 @@ function render() {
   $("plan").innerHTML = m.past ? `<p class="muted small">La fiesta ya pasó.</p>` : plan.map(p => `<div class="day"><div class="when"><b>${esc(fmtDay(p.date))}</b>${p.d === 0 ? "fiesta" : "faltan " + p.d}</div><div class="what"><div><span class="tag">${esc(p.tag)}</span>${esc(p.feed)}</div><div class="small muted">${esc(p.stories)}</div></div></div>`).join("");
   $("ideas").innerHTML = ideasFor(ev, m).map(t => `<li>${esc(t)}</li>`).join("");
 
-  const ts = ev.tierSold || {}, tiers = (ev.tiers || []).slice();
-  Object.keys(ts).forEach(n => { if (!tiers.find(t => t.name === n)) tiers.push({name:n}); });
-  $("tierSub").textContent = Object.keys(ts).length ? "Según el último Excel" : "Sube el Excel para ver el reparto";
-  $("tiers").innerHTML = tiers.length ? `<thead><tr><th>Tipo</th><th class="r">Precio</th><th class="r">Vendidas</th><th class="r">Cupo</th><th class="r">Ingresos</th></tr></thead><tbody>` + tiers.map(t => { const s = ts[t.name] || {}; return `<tr><td>${esc(t.name)}</td><td class="r num">${t.price ? eur(t.price) : "—"}</td><td class="r num">${int(s.q || 0)}</td><td class="r num">${t.qty ? int(t.qty) : "—"}${t.qty && s.q >= t.qty ? " ✓" : ""}</td><td class="r num">${eur(s.r || 0)}</td></tr>`; }).join("") + "</tbody>" : `<tbody><tr><td class="muted">Añade las tandas en “Editar fiesta” o sube el Excel.</td></tr></tbody>`;
+  renderCampaign(ev, m);
+  const ph = phasesOf(ev);
+  const chipCls = {activo:"good", agotado:"bad", cerrado:"", "por abrir":"info"};
+  $("tierSub").textContent = Object.keys(ev.tierSold || {}).length ? "Según el último Excel" : "Sube el Excel para ver el reparto";
+  $("tiers").innerHTML = ph.list.length ? `<thead><tr><th>Tramo</th><th>Estado</th><th class="r">Precio</th><th class="r">Vendidas</th><th class="r">Cupo</th><th class="r">Ingresos</th><th>Fechas</th></tr></thead><tbody>` + ph.list.map(p => `<tr><td>${esc(p.name)}</td><td><span class="chip ${chipCls[p.state] || ""}">${esc(p.state)}</span></td><td class="r num">${p.price ? eur(p.price) : "—"}</td><td class="r num">${int(p.sold)}</td><td class="r num">${p.qty ? int(p.qty) : "—"}</td><td class="r num">${eur(p.rev)}</td><td class="small muted num">${p.first ? fmtDM(p.first) + (p.last && p.last !== p.first ? "–" + fmtDM(p.last) : "") : p.opens ? "abre " + fmtDM(p.opens) : ""}</td></tr>`).join("") + "</tbody>" : `<tbody><tr><td class="muted">Sube el Excel o añade los tramos en “Editar fiesta”.</td></tr></tbody>`;
 
   $("lastUpd").textContent = m.lastUpdate && !isExample ? "Última actualización: " + m.lastUpdate.toLocaleString("es-ES", {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}) : "";
   $("aiOut").hidden = true; $("aiOut").textContent = "";
@@ -583,11 +753,25 @@ function openForm(ev) {
   $("delBtn").hidden = !ev;
   $("fName").value = ev?.name || ""; $("fDate").value = ev ? toLocalInput(evDate(ev)) : "";
   $("fCap").value = ev?.capacity || ""; $("fFinal").value = ev?.finalSold || "";
-  $("fTiers").value = (ev?.tiers || []).map(t => [t.name, t.price ?? "", t.qty ?? ""].join("; ")).join("\n");
   $("fNotes").value = ev?.notes || "";
+  const cx = ev?.ctx || {};
+  $("fLineup").value = cx.lineup || ""; $("fLineupNext").value = cx.lineupNext || ""; $("fArtists").value = cx.artists || "";
+  $("fBudget").value = cx.budget ?? ""; $("fRrpp").value = cx.rrpp ?? ""; $("fIg").value = cx.ig ?? ""; $("fTt").value = cx.tt ?? ""; $("fDone").value = cx.done || "";
+  $("phaseRows").innerHTML = "";
+  const ph = ev ? phasesOf(ev).list : [];
+  (ph.length ? ph : [{}]).forEach(p => addPhaseRow(p));
   $("formPanel").scrollIntoView({behavior:"smooth", block:"start"});
   $("fName").focus({preventScroll:true});
 }
+function addPhaseRow(p = {}) {
+  const tr = document.createElement("tr");
+  const st = p.status && p.status !== "auto" ? p.status : "auto";
+  tr.innerHTML = `<td><input class="pName" value="${esc(p.name || "")}" placeholder="Tramo 5 - General"></td><td><input class="pPrice" type="number" step="0.01" min="0" value="${p.price ?? ""}" style="width:90px"></td><td><input class="pQty" type="number" min="0" value="${p.qty ?? ""}" style="width:80px"></td><td><select class="pStatus">${[["auto","Automático"],["activo","Activo"],["agotado","Agotado"],["cerrado","Cerrado"],["por abrir","Por abrir"]].map(([v, l]) => `<option value="${v}"${v === st ? " selected" : ""}>${l}${v === "auto" && p.state ? " (" + p.state + ")" : ""}</option>`).join("")}</select></td><td><input class="pOpens" type="date" value="${p.opens || ""}"></td><td><button type="button" class="pDel" aria-label="Quitar tramo">✕</button></td>`;
+  tr.querySelector(".pDel").onclick = () => tr.remove();
+  $("phaseRows").append(tr);
+}
+$("addPhase").onclick = () => addPhaseRow({status: "por abrir"});
+$("campEdit").onclick = () => openForm(current());
 $("newBtn").onclick = () => openForm(null);
 const openXls = () => { $("xlsPanel").hidden = false; $("formPanel").hidden = true; $("xlsPanel").scrollIntoView({behavior:"smooth", block:"start"}); };
 $("startBtn").onclick = openXls;
@@ -598,9 +782,12 @@ $("cancelBtn").onclick = () => { $("formPanel").hidden = true; };
 $("saveBtn").onclick = async () => {
   const name = $("fName").value.trim(), date = $("fDate").value, cap = Number($("fCap").value);
   if (!name || !date || !cap) { $("formMsg").className = "small err"; $("formMsg").textContent = "Falta el nombre, la fecha o el aforo."; return; }
-  const tiers = $("fTiers").value.split("\n").map(l => l.split(/[;|\t]/).map(s => s.trim())).filter(a => a[0]).map(([n, p, q]) => ({name:n, price: parseNum(p) || null, qty: parseNum(q) || null}));
+  const phases = [...$("phaseRows").querySelectorAll("tr")].map(tr => ({name: tr.querySelector(".pName").value.trim(), price: parseNum(tr.querySelector(".pPrice").value), qty: parseNum(tr.querySelector(".pQty").value), status: tr.querySelector(".pStatus").value, opens: tr.querySelector(".pOpens").value || null})).filter(p => p.name);
+  const num = id => { const v = parseNum($(id).value); return v == null ? null : v; };
+  const ctx = {lineup: $("fLineup").value || null, lineupNext: $("fLineupNext").value || null, artists: $("fArtists").value.trim(), budget: num("fBudget"), rrpp: num("fRrpp"), ig: num("fIg"), tt: num("fTt"), done: $("fDone").value.trim()};
   const ev = editing ? JSON.parse(JSON.stringify(editing)) : {id: "ev-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), points:{}, tierSold:{}};
-  Object.assign(ev, {name, date: new Date(date).toISOString(), capacity: cap, tiers, notes: $("fNotes").value.trim(), finalSold: parseNum($("fFinal").value) || null});
+  Object.assign(ev, {name, date: new Date(date).toISOString(), capacity: cap, phases, ctx, notes: $("fNotes").value.trim(), finalSold: parseNum($("fFinal").value) || null});
+  delete ev.tiers;
   delete ev.example;
   $("saveBtn").disabled = true;
   try { await saveEvent(ev); selId = ev.id; $("formPanel").hidden = true; render(); }
@@ -655,7 +842,8 @@ const GUESS = {
   Type: [/tipo.*entrada|tarifa|ticket type/i, /tipo|entrada|ticket|categor|zona/i],
   Qty: [/^(cantidad|unidades|uds\.?|qty|quantity|n.? ?entradas|entradas)$/i, /cantidad(?!.*(descuento|dto))/i],
   Status: [/estado|status/i],
-  Invite: [/invitaci/i]
+  Invite: [/invitaci/i],
+  Order: [/^n.?\s?(de\s)?pedido$|^pedido$|order.?(id|n)/i]
 };
 function guess(headers, pats, avoid) { for (const p of pats) { const i = headers.findIndex((h, j) => p.test(h) && !avoid.includes(j)); if (i >= 0) return i; } return -1; }
 // Entradium names exports like "listas-saturno-12-09-12092026-2300.xlsx": party name, then date and time.
@@ -685,7 +873,7 @@ async function readSheet(f) {
 }
 function fillMapping(prefix, fields, headers) {
   const used = [];
-  const order = ["Session", "Event", "Date", "Price", "Type", "Qty", "Status", "Invite"].filter(k => fields.includes(k));
+  const order = ["Session", "Event", "Date", "Price", "Type", "Qty", "Status", "Invite", "Order"].filter(k => fields.includes(k));
   for (const k of order) {
     const g = guess(headers, GUESS[k], used); if (g >= 0) used.push(g);
     $(prefix + k).innerHTML = `<option value="-1">— ninguna —</option>` + headers.map((h, i) => `<option value="${i}"${i === g ? " selected" : ""}>${esc(h)}</option>`).join("");
@@ -693,7 +881,7 @@ function fillMapping(prefix, fields, headers) {
 }
 const col = (prefix, k) => $(prefix + k) ? Number($(prefix + k).value) : -1;
 function aggregate(rows, ix) {
-  const daily = {}, tierSold = {}, sessions = {}; let ok = 0, skipped = 0, invites = 0;
+  const daily = {}, tierSold = {}, sessions = {}, tierDates = {}, orders = {}, byHour = Array(24).fill(0), byWeekday = Array(7).fill(0); let ok = 0, skipped = 0, invites = 0, addon = 0;
   for (const r of rows) {
     if (ix.Status >= 0 && /anul|cancel|devuel|reembol|refund|rechaz/i.test(String(r[ix.Status] ?? ""))) { skipped++; continue; }
     const d = parseDate(r[ix.Date]); if (!d) { skipped++; continue; }
@@ -705,6 +893,10 @@ function aggregate(rows, ix) {
     daily[k] = daily[k] || {q:0, r:0}; daily[k].q += q; daily[k].r += p;
     const t = ix.Type >= 0 ? String(r[ix.Type] ?? "Sin tipo").trim() : "General";
     tierSold[t] = tierSold[t] || {q:0, r:0}; tierSold[t].q += q; tierSold[t].r += p;
+    const tdt = tierDates[t] = tierDates[t] || {first:k, last:k}; if (k < tdt.first) tdt.first = k; if (k > tdt.last) tdt.last = k;
+    byHour[d.getHours()] += q; byWeekday[d.getDay()] += q;
+    if (isAddon(t)) addon += q;
+    if (ix.Order >= 0 && r[ix.Order] != null && r[ix.Order] !== "") orders[r[ix.Order]] = (orders[r[ix.Order]] || 0) + q;
     if (ix.Session >= 0) { const sd = parseDate(r[ix.Session]); if (sd) { const sk = sd.toISOString(); sessions[sk] = (sessions[sk] || 0) + 1; } }
     ok++;
   }
@@ -713,7 +905,9 @@ function aggregate(rows, ix) {
   for (const k of keys) { sold += daily[k].q; rev += daily[k].r; points[k] = {sold, rev: Math.round(rev * 100) / 100}; }
   for (const t in tierSold) tierSold[t].r = Math.round(tierSold[t].r * 100) / 100;
   const sess = Object.entries(sessions).sort((a, b) => b[1] - a[1])[0];
-  return {points, tierSold, ok, skipped, invites, sold, rev, lastKey: keys[keys.length - 1], firstKey: keys[0], session: sess ? new Date(sess[0]) : null};
+  const nOrders = Object.keys(orders).length;
+  const insights = {byHour, byWeekday, addonShare: sold ? addon / sold : null, orders: nOrders || null, avgOrder: nOrders ? sold / nOrders : null};
+  return {points, tierSold, tierDates, insights, ok, skipped, invites, sold, rev, lastKey: keys[keys.length - 1], firstKey: keys[0], session: sess ? new Date(sess[0]) : null};
 }
 const IX = prefix => Object.fromEntries(Object.keys(GUESS).map(k => [k, col(prefix, k)]));
 
@@ -722,7 +916,7 @@ async function handleFile(f) {
   $("importMsg").textContent = ""; $("mapBox").hidden = true;
   try {
     sheet = await readSheet(f);
-    fillMapping("m", ["Date", "Price", "Type", "Qty", "Status", "Invite"], sheet.headers);
+    fillMapping("m", ["Date", "Price", "Type", "Qty", "Status", "Invite", "Order"], sheet.headers);
     $("mapInfo").textContent = `${f.name}: ${sheet.rows.length} filas. Revisa que cada dato apunta a su columna. Si no hay columna de cantidad, cuento una entrada por fila.`;
   } catch (e) { $("mapInfo").textContent = "No he podido leer ese archivo. Prueba con el .xls o .xlsx tal cual lo descarga Entradium."; }
   $("mapBox").hidden = false;
@@ -743,7 +937,7 @@ $("importBtn").onclick = async () => {
   if (!a.ok) { $("importMsg").className = "small err"; $("importMsg").textContent = "No encontré fechas válidas en esa columna."; return; }
   const points = a.points;
   for (const k in (ev.points || {})) if (k > a.lastKey) points[k] = ev.points[k]; // keep quick notes newer than the file
-  const e2 = JSON.parse(JSON.stringify(ev)); e2.points = points; e2.tierSold = a.tierSold; e2.invites = a.invites + (sheet.inviteRows || 0); e2.lastImport = {rows: a.ok, skipped: a.skipped, at: new Date().toISOString()};
+  const e2 = JSON.parse(JSON.stringify(ev)); e2.points = points; e2.tierSold = a.tierSold; e2.tierDates = a.tierDates; e2.insights = a.insights; e2.invites = a.invites + (sheet.inviteRows || 0); e2.lastImport = {rows: a.ok, skipped: a.skipped, at: new Date().toISOString()};
   try { await saveEvent(e2); $("importMsg").className = "small ok"; $("importMsg").textContent = `Importadas ${int(a.sold)} entradas (${a.ok} filas${a.skipped ? ", " + a.skipped + " descartadas" : ""}).`; $("mapBox").hidden = true; sheet = null; $("file").value = ""; }
   catch (e) { $("importMsg").className = "small err"; $("importMsg").textContent = "No se pudo guardar (" + (e.code || "error") + ")."; }
 };
@@ -771,7 +965,7 @@ function buildDrafts() {
         <label>Fecha y hora de la fiesta${d.dateGuessed && !d.existing ? " (revísala)" : ""}<input id="nd-date-${i}" type="datetime-local" value="${toLocalInput(d.existing ? evDate(d.existing) : d.date)}"></label>
         <label>Aforo<input id="nd-cap-${i}" type="number" min="1" inputmode="numeric" value="${d.existing?.capacity || ""}" placeholder="${new Date(d.date) < new Date() ? "opcional en fiestas pasadas" : "ej. 600"}"></label>
       </div>
-      <span class="small muted">Tandas: ${d.tiers.map(t => esc(t.name) + (t.price ? " (" + eur(t.price) + ")" : "")).join(", ")}</span>
+      <span class="small muted">Tramos: ${[...new Set(Object.keys(d.a.tierSold).map(phaseOf))].map(esc).join(", ")}. Después podrás añadir los que quedan por abrir y el line-up en “Editar fiesta”.</span>
     </div>`).join("") : `<p class="small err">No encontré ventas con fecha válida. Revisa las columnas.</p>`;
   $("nCreate").textContent = drafts.length > 1 ? `Crear ${drafts.length} fiestas` : drafts[0]?.existing ? "Actualizar fiesta" : "Crear fiesta";
   $("nCreate").disabled = !drafts.length;
@@ -787,7 +981,7 @@ async function handleNewFile(f) {
   $("nMapBox").hidden = false;
 }
 wireDrop("drop2", "file2", handleNewFile);
-["nDate", "nPrice", "nType", "nQty", "nStatus", "nEvent", "nSession", "nInvite"].forEach(id => $(id).addEventListener("change", () => sheet2 && buildDrafts()));
+["nDate", "nPrice", "nType", "nQty", "nStatus", "nEvent", "nSession", "nInvite", "nOrder"].forEach(id => $(id).addEventListener("change", () => sheet2 && buildDrafts()));
 $("nCreate").onclick = async () => {
   if (!drafts.length) return;
   const out = [];
@@ -800,8 +994,7 @@ $("nCreate").onclick = async () => {
     const base = d.existing ? JSON.parse(JSON.stringify(d.existing)) : {id: "ev-" + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6), notes: ""};
     const points = d.a.points;
     for (const k in (base.points || {})) if (k > d.a.lastKey) points[k] = base.points[k];
-    const tiers = (base.tiers && base.tiers.length) ? base.tiers : d.tiers;
-    Object.assign(base, {name, date: date.toISOString(), capacity: cap || null, points, tierSold: d.a.tierSold, tiers, invites: d.a.invites || 0, lastImport: {rows: d.a.ok, skipped: d.a.skipped, at: new Date().toISOString()}});
+    Object.assign(base, {name, date: date.toISOString(), capacity: cap || null, points, tierSold: d.a.tierSold, tierDates: d.a.tierDates, insights: d.a.insights, invites: d.a.invites || 0, lastImport: {rows: d.a.ok, skipped: d.a.skipped, at: new Date().toISOString()}});
     out.push(base);
   }
   $("nCreate").disabled = true;
@@ -820,9 +1013,7 @@ $("nCreate").onclick = async () => {
 /* ---------- Claude advice ---------- */
 let ctl = null;
 function adviceData(ev, m) {
-  const pasts = pastEvents(ev).slice(0, 4).map(e => { const pm = metrics(e); return {nombre:e.name, fecha:evDate(e).toISOString().slice(0, 10), aforo:pm.cap, vendidas:pm.sold, ingresos:Math.round(pm.rev), vendidas_7_dias_antes:soldAt(series(e), 7), vendidas_14_dias_antes:soldAt(series(e), 14)}; });
-  const ser = series(ev).slice(-14).map(p => ({dia:p.k, acumuladas:p.sold}));
-  return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleDateString("es-ES"), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc, tandas:(ev.tiers || []).map(t => ({...t, vendidas:(ev.tierSold || {})[t.name]?.q || 0})), ultimos_dias:ser, fiestas_pasadas:pasts, notas_del_organizador:ev.notes || ""};
+  return adviceDataFor(ev, m);
 }
 $("aiBtn").onclick = async () => {
   const ev = current(); const m = metrics(ev);
