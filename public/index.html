@@ -439,20 +439,38 @@ function metrics(ev) {
   const cap = Number(ev.capacity) || 0;
   const daysLeft = (evDate(ev) - now) / DAY;
   const dNow = Math.max(0, Math.round((startOfDay(evDate(ev)) - startOfDay(now)) / DAY));
-  const s7 = soldAt(ser, dNow + 7);
-  const firstD = ser.length ? ser[0].d : dNow;
-  const span = Math.max(1, Math.min(7, firstD - dNow));
-  const pace7 = ser.length ? (sold - (firstD - dNow < 7 ? 0 : s7)) / span : 0;
+  // measure pace and the curve from the day of the last data, not from today (the Excel may be a few days old)
+  const dLast = last ? Math.max(dNow, last.d) : dNow;
+  const firstD = ser.length ? ser[0].d : dLast;
+  const hist = firstD - dLast;
+  const s7 = soldAt(ser, dLast + 7), s3 = soldAt(ser, dLast + 3);
+  const span = Math.max(1, Math.min(7, hist));
+  const pace7 = ser.length ? (sold - (hist < 7 ? 0 : s7)) / span : 0;
+  const pace3 = hist >= 3 ? (sold - s3) / 3 : pace7;
+  const pacePrev = hist >= 7 ? (s3 - s7) / 4 : null;
+  const trendDown = pacePrev != null && pacePrev >= 1 && pace3 < pacePrev * 0.6;
   const remaining = Math.max(0, cap - sold);
   const needed = daysLeft > 0 ? remaining / Math.max(1, Math.ceil(daysLeft)) : 0;
-  const fr = fracAt(ev, dNow);
-  const projected = sold > 0 ? Math.round(sold / Math.max(fr.f, .05)) : 0;
+  const fr = fracAt(ev, dLast);
+  const curveProj = sold > 0 ? sold / Math.max(fr.f, .05) : 0;
+  // pace forecast: keep selling at the last-7-day rate, lifted by how much a typical party speeds up
+  // in its final days. If that is below the curve (sales slowing down), trust the pace.
+  const dRem = Math.max(0, daysLeft + (dLast - dNow));
+  const g = genericFrac(dLast), g7 = genericFrac(dLast + 7);
+  const lift = dRem > 0 && g7 < g ? Math.min(2, Math.max(1, ((1 - g) / Math.max(1, dRem)) / ((g - g7) / 7))) : 1;
+  const paceProj = sold + pace7 * dRem * lift;
+  const curveOk = sold > 0;
+  let projected = curveOk ? curveProj : 0;
+  if (curveOk && hist >= 3 && dRem > 0) projected = paceProj < curveProj ? paceProj : (curveProj + paceProj) / 2;
+  if (trendDown && dRem > 0) projected = Math.min(projected, sold + pace3 * dRem * lift);
+  projected = Math.round(projected);
+  const momentum = curveProj ? projected / curveProj : 1;
   const avgPrice = sold ? rev / sold : null;
   const ph = phasesOf(ev);
   const nextPrice = (ph.current && ph.current.price) || (ph.next && ph.next.price) || avgPrice;
   const projRev = projected > sold ? rev + (Math.min(projected, cap || projected) - sold) * (nextPrice || avgPrice || 0) : rev;
   const lastUpdate = ev.updatedAt ? new Date(ev.updatedAt) : null;
-  return {sold, rev, cap, daysLeft, dNow, pace7, remaining, needed, projected, projRev, avgPrice, frSrc: fr.src, frac: fr.f, ratio: cap ? projected / cap : null, fill: cap ? sold / cap : null, lastUpdate, past: daysLeft < -0.5};
+  return {sold, rev, cap, daysLeft, dNow, dLast, pace7, pace3, pacePrev, trendDown, momentum, remaining, needed, projected, projRev, avgPrice, frSrc: fr.src, frac: fr.f, ratio: cap ? projected / cap : null, fill: cap ? sold / cap : null, lastUpdate, past: daysLeft < -0.5};
 }
 
 function verdictOf(m) {
@@ -461,9 +479,14 @@ function verdictOf(m) {
   if (!m.cap) return {tone:"neutral", pill:"Falta el aforo", line:`Llevas ${int(m.sold)} entradas y ${eur(m.rev)}. Pon el aforo en “Editar fiesta” para ver si vas a llenar.`, sub:""};
   if (m.fill >= 0.95) return {tone:"good", pill:"Casi sold out", line:`Quedan ${int(m.remaining)} entradas. Usa la escasez: anuncia que se acaban.`, sub:"No gastes en publicidad; empuja con stories de “últimas entradas”."};
   const r = m.ratio;
-  if (r >= 1) return {tone:"good", pill:"Vas a llenar", line:`Al ritmo actual acabarías en unas ${int(Math.min(m.projected, m.cap))} de ${int(m.cap)}. Mantén el ritmo de publicaciones.`, sub:`Previsión basada en ${m.frSrc}.`};
-  if (r >= 0.85) return {tone:"warn", pill:"Empuja un poco", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Te faltan unas ${int(m.cap - m.projected)} ventas para llenar.`, sub:`Previsión basada en ${m.frSrc}.`};
-  return {tone:"bad", pill:"Aprieta en redes", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Necesitas ${int(m.needed)} ventas al día y vas a ${m.pace7.toFixed(1).replace(".", ",")}.`, sub:`Previsión basada en ${m.frSrc}.`};
+  const f1 = x => x.toFixed(1).replace(".", ",");
+  const stale = m.dLast - m.dNow >= 2 ? ` Tus datos son de hace ${m.dLast - m.dNow} días: sube el Excel de hoy para afinar.` : "";
+  const slow = m.needed > 0 && m.pace7 < m.needed * 0.5 && m.daysLeft > 2;
+  if (m.trendDown) return {tone: r >= 1 && !slow ? "warn" : "bad", pill:"Ventas bajando", line:`En los últimos 3 días vendes ${f1(m.pace3)} al día, frente a ${f1(m.pacePrev)} de los días anteriores. La previsión baja a ${int(m.projected)} de ${int(m.cap)} (${pct(r)}).`, sub:`Necesitas ${int(m.needed)} al día para llenar. Previsión basada en ${m.frSrc} y en tu ritmo reciente.${stale}`};
+  if (r >= 1 && slow) return {tone:"warn", pill:"Ritmo bajo", line:`La curva de tus fiestas dice que llegarías a ${int(Math.min(m.projected, m.cap))}, pero vas a ${f1(m.pace7)} al día y necesitas ${int(m.needed)}. Solo llenas si se repite el empujón final de otras veces.`, sub:`Previsión basada en ${m.frSrc} y en tu ritmo reciente.${stale}`};
+  if (r >= 1) return {tone:"good", pill:"Vas a llenar", line:`Al ritmo actual acabarías en unas ${int(Math.min(m.projected, m.cap))} de ${int(m.cap)}. Mantén el ritmo de publicaciones.`, sub:`Previsión basada en ${m.frSrc} y en tu ritmo reciente.${stale}`};
+  if (r >= 0.85) return {tone:"warn", pill:"Empuja un poco", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Te faltan unas ${int(m.cap - m.projected)} ventas para llenar.`, sub:`Previsión basada en ${m.frSrc} y en tu ritmo reciente.${stale}`};
+  return {tone:"bad", pill:"Aprieta en redes", line:`La previsión es ${int(m.projected)} de ${int(m.cap)} (${pct(r)}). Necesitas ${int(m.needed)} ventas al día y vas a ${m.pace7.toFixed(1).replace(".", ",")}.`, sub:`Previsión basada en ${m.frSrc} y en tu ritmo reciente.${stale}`};
 }
 
 /* ---------- campaign context ---------- */
@@ -530,7 +553,7 @@ function adviceDataFor(ev, m) {
   const ph = phasesOf(ev), cx = ctxOf(ev), ins = insightsOf(ev);
   const tramo = p => p && {nombre:p.name, estado:p.state, precio:p.price, vendidas:p.sold, cupo:p.qty, quedan:p.left, ventas_dia:p.pace && +p.pace.toFixed(1), primera_venta:p.first, ultima_venta:p.last, abre:p.opens};
   const num = v => v === "" || v == null ? null : +v;
-  return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"}), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, invitaciones:ev.invites || 0, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc,
+  return {fiesta:ev.name, fecha:evDate(ev).toLocaleString("es-ES"), hoy:new Date().toLocaleString("es-ES", {weekday:"long", day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"}), dias_que_faltan:+m.daysLeft.toFixed(1), aforo:m.cap, vendidas:m.sold, invitaciones:ev.invites || 0, ingresos_eur:Math.round(m.rev), precio_medio:m.avgPrice && +m.avgPrice.toFixed(2), ritmo_ultimos_7_dias:+m.pace7.toFixed(1), ritmo_ultimos_3_dias:+m.pace3.toFixed(1), ritmo_4_dias_anteriores:m.pacePrev != null ? +m.pacePrev.toFixed(1) : null, ventas_bajando:m.trendDown, dias_desde_ultimos_datos:m.dLast - m.dNow, ventas_dia_necesarias:Math.round(m.needed), prevision_final:m.projected, base_prevision:m.frSrc,
     es_ultimo_tramo:!!(ph.current && !ph.next), line_up:{estado:LINEUP_TXT[cx.lineup] || "sin indicar", fecha_proximo_anuncio:cx.lineupNext || null, artistas:cx.artists || null},
     tramo_actual:tramo(ph.current), siguiente_tramo:tramo(ph.next), tramos:ph.list.map(tramo),
     cuando_compra_el_publico:ins && {mejor_franja:`${ins.bestFrom}:00-${ins.bestTo}:00`, porcentaje_en_esa_franja:Math.round(ins.bestShare * 100), mejores_dias:ins.topDays, porcentaje_con_copa:ins.addonShare != null ? Math.round(ins.addonShare * 100) : null, entradas_por_pedido:ins.avgOrder && +ins.avgOrder.toFixed(2)},
